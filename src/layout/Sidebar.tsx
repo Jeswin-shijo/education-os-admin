@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
+import { Logo } from '../components/Logo';
 import { cn } from '../lib/cn';
 
 type NavItem = { to: string; label: string; icon: IconName };
@@ -10,30 +11,30 @@ const groups: NavGroup[] = [
   {
     title: 'People',
     items: [
-      { to: '/students', label: 'Students', icon: 'people' },
-      { to: '/faculty', label: 'Faculty', icon: 'people' },
+      { to: '/students', label: 'Students', icon: 'student' },
+      { to: '/faculty', label: 'Faculty', icon: 'faculty' },
       { to: '/parents', label: 'Parents', icon: 'people' },
-      { to: '/users', label: 'Users & Roles', icon: 'people' },
+      { to: '/users', label: 'Users & Roles', icon: 'role' },
     ],
   },
   {
     title: 'Academics',
     items: [
-      { to: '/departments', label: 'Departments', icon: 'academics' },
-      { to: '/courses', label: 'Courses', icon: 'academics' },
-      { to: '/subjects', label: 'Subjects', icon: 'academics' },
-      { to: '/timetable', label: 'Timetable', icon: 'academics' },
-      { to: '/attendance', label: 'Attendance', icon: 'academics' },
+      { to: '/departments', label: 'Departments', icon: 'department' },
+      { to: '/courses', label: 'Courses', icon: 'course' },
+      { to: '/subjects', label: 'Subjects', icon: 'subject' },
+      { to: '/timetable', label: 'Timetable', icon: 'timetable' },
+      { to: '/attendance', label: 'Attendance', icon: 'attendance' },
     ],
   },
   {
     title: 'Campus',
     items: [
-      { to: '/fees', label: 'Fees', icon: 'campus' },
-      { to: '/library', label: 'Library', icon: 'campus' },
-      { to: '/hostel', label: 'Hostel', icon: 'campus' },
-      { to: '/transport', label: 'Transport', icon: 'campus' },
-      { to: '/notifications', label: 'Notifications', icon: 'campus' },
+      { to: '/fees', label: 'Fees', icon: 'fees' },
+      { to: '/library', label: 'Library', icon: 'library' },
+      { to: '/hostel', label: 'Hostel', icon: 'hostel' },
+      { to: '/transport', label: 'Transport', icon: 'transport' },
+      { to: '/notifications', label: 'Notifications', icon: 'notification' },
     ],
   },
   { items: [{ to: '/audit-logs', label: 'Audit Logs', icon: 'audit' }] },
@@ -48,7 +49,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate?: () =
       )}
     >
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-navy-dark font-extrabold">A</div>
+        <Logo size={36} />
         <div className="leading-tight">
           <div className="text-title text-white">AI Campus OS</div>
           <div className="text-caption text-navy-muted">Admin Console</div>

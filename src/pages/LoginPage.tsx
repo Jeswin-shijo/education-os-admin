@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
-import { Button, TextField, Banner } from '../components';
+import { Button, TextField, Banner, Logo } from '../components';
 
 export function LoginPage() {
   const { status, login } = useAuth();
@@ -29,8 +29,8 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-navy-dark px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-accent text-h1 font-extrabold text-navy-dark">
-            A
+          <div className="mx-auto mb-4">
+            <Logo size={56} />
           </div>
           <h1 className="text-h1 text-white">AI Campus OS</h1>
           <p className="mt-1 text-body text-navy-soft">Admin Console — manage every record in one place</p>

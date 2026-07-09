@@ -1,4 +1,5 @@
 export * from './Icon';
+export * from './Logo';
 export * from './Button';
 export * from './Card';
 export * from './Avatar';
