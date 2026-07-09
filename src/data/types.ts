@@ -9,6 +9,9 @@ export type AdminAccount = {
   avatarColor: string;
 };
 
+export type Gender = 'Male' | 'Female' | 'Other';
+export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+
 export type Student = {
   id: string;
   name: string;
@@ -23,8 +26,11 @@ export type Student = {
   year: number;
   cgpa: number;
   avatarColor: string;
+  avatarUrl?: string;
   mentorName: string;
   bloodGroup: string;
+  gender: Gender;
+  dob: string;
 };
 
 export type FacultyMember = {

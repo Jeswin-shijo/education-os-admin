@@ -12,6 +12,7 @@ import {
   Modal,
   TextField,
   Select,
+  DatePicker,
   StatusPill,
   Banner,
   Loading,
@@ -172,7 +173,7 @@ export function FeesPage() {
             <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
             <TextField label="Term" value={form.term} onChangeText={(v) => setForm((f) => ({ ...f, term: v }))} />
             <TextField label="Amount" type="number" value={form.amount} onChangeText={(v) => setForm((f) => ({ ...f, amount: v }))} />
-            <TextField label="Due date" type="date" value={form.dueDate} onChangeText={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
+            <DatePicker label="Due date" value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
           </div>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />

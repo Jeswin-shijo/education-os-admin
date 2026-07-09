@@ -11,6 +11,7 @@ export * from './EmptyState';
 export * from './Loading';
 export * from './TextField';
 export * from './Select';
+export * from './DatePicker';
 export * from './SearchBar';
 export * from './Table';
 export * from './Modal';
