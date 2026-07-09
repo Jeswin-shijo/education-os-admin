@@ -29,7 +29,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-navy-dark px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4">
+          <div className="mb-4 flex justify-center">
             <Logo size={56} />
           </div>
           <h1 className="text-h1 text-white">AI Campus OS</h1>

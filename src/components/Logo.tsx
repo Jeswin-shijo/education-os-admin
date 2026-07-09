@@ -9,9 +9,9 @@ export function Logo({ size = 40, rounded = true }: { size?: number; rounded?: b
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx={rounded ? 14 : 0} fill={`url(#${gradientId})`} />
-      <rect x="23" y="27" width="18" height="12" rx="3" fill="#D99700" />
-      <path d="M32 16 53 26 32 36 11 26 32 16Z" fill="#F7B500" />
-      <circle cx="49" cy="24" r="3.4" fill="#FFFFFF" />
+      <rect x="23" y="31.5" width="18" height="12" rx="3" fill="#D99700" />
+      <path d="M32 20.5 53 30.5 32 40.5 11 30.5 32 20.5Z" fill="#F7B500" />
+      <circle cx="49" cy="28.5" r="3.4" fill="#FFFFFF" />
     </svg>
   );
 }
