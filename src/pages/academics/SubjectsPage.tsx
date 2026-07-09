@@ -25,18 +25,23 @@ const emptyForm = {
   code: '',
   name: '',
   credits: '3',
-  faculty: '',
-  departmentCode: '',
+  departmentId: '',
+  programId: '', // transient — only used to filter the Semester dropdown, not stored on Subject
+  semesterId: '',
+  facultyId: '',
 };
 
 export function SubjectsPage() {
   const [q, setQ] = useState('');
   const { data: rows, loading, reload } = useAsync(() => adminService.subjects.list(q), [q]);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
+  const { data: allPrograms } = useAsync(() => adminService.programs.list(), []);
+  const { data: facultyCandidates } = useAsync(() => adminService.subjects.facultyCandidates(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Subject | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [semesterOptions, setSemesterOptions] = useState<{ id: string; number: number }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
 
@@ -45,31 +50,62 @@ export function SubjectsPage() {
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.code }));
+  const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
+  const departmentName = (id: string) => departments?.find((d) => d.id === id)?.name ?? '—';
+  const facultyName = (id?: string) => facultyCandidates?.find((f) => f.id === id)?.fullName ?? '—';
+  const programsForDept = (departmentId: string) => (allPrograms ?? []).filter((p) => p.departmentId === departmentId);
 
-  function openCreate() {
+  async function loadSemesters(programId: string) {
+    if (!programId) {
+      setSemesterOptions([]);
+      return;
+    }
+    const rows = await adminService.semesters.list(programId);
+    setSemesterOptions(rows.map((s) => ({ id: s.id, number: s.number })));
+  }
+
+  async function openCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, departmentCode: departments?.[0]?.code ?? '' });
+    const firstDept = departments?.[0]?.id ?? '';
+    const firstProgram = programsForDept(firstDept)[0]?.id ?? '';
+    setForm({ ...emptyForm, departmentId: firstDept, programId: firstProgram });
+    await loadSemesters(firstProgram);
     setFormError(undefined);
     setModalOpen(true);
   }
 
-  function openEdit(s: Subject) {
+  async function openEdit(s: Subject) {
     setEditing(s);
+    // Best-effort: find which program this subject's semester belongs to, for the cascade.
+    const owningProgramId = (allPrograms ?? []).find((p) => p.departmentId === s.departmentId)?.id ?? '';
     setForm({
       code: s.code,
       name: s.name,
       credits: String(s.credits),
-      faculty: s.faculty,
-      departmentCode: s.departmentCode,
+      departmentId: s.departmentId,
+      programId: owningProgramId,
+      semesterId: s.semesterId,
+      facultyId: s.facultyId ?? '',
     });
+    await loadSemesters(owningProgramId);
     setFormError(undefined);
     setModalOpen(true);
   }
 
+  async function handleDepartmentChange(departmentId: string) {
+    const firstProgram = programsForDept(departmentId)[0]?.id ?? '';
+    setForm((f) => ({ ...f, departmentId, programId: firstProgram, semesterId: '' }));
+    await loadSemesters(firstProgram);
+  }
+
+  async function handleProgramChange(programId: string) {
+    setForm((f) => ({ ...f, programId, semesterId: '' }));
+    await loadSemesters(programId);
+  }
+
   async function handleSave() {
-    if (!form.code.trim() || !form.name.trim() || !form.faculty.trim() || !form.departmentCode.trim()) {
-      setFormError('Code, name, faculty, and department are required');
+    if (!form.code.trim() || !form.name.trim() || !form.departmentId || !form.semesterId) {
+      setFormError('Code, name, department, and semester are required');
       return;
     }
     setSaving(true);
@@ -79,8 +115,10 @@ export function SubjectsPage() {
         code: form.code,
         name: form.name,
         credits: Number(form.credits) || 1,
-        faculty: form.faculty,
-        departmentCode: form.departmentCode,
+        departmentId: form.departmentId,
+        semesterId: form.semesterId,
+        facultyId: form.facultyId || undefined,
+        facultyName: form.facultyId ? facultyName(form.facultyId) : undefined,
         color: editing?.color ?? NAVY,
       };
       if (editing) {
@@ -129,8 +167,8 @@ export function SubjectsPage() {
       ),
     },
     { key: 'credits', header: 'Credits', render: (s) => s.credits },
-    { key: 'faculty', header: 'Faculty', render: (s) => s.faculty },
-    { key: 'departmentCode', header: 'Department', render: (s) => s.departmentCode },
+    { key: 'faculty', header: 'Faculty', render: (s) => s.facultyName ?? facultyName(s.facultyId) },
+    { key: 'department', header: 'Department', render: (s) => departmentName(s.departmentId) },
     {
       key: 'actions',
       header: '',
@@ -181,7 +219,7 @@ export function SubjectsPage() {
         <Table columns={columns} rows={rows} />
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit subject' : 'Add subject'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit subject' : 'Add subject'} width={560}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
@@ -189,13 +227,25 @@ export function SubjectsPage() {
             <TextField label="Name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
             <TextField label="Credits" type="number" value={form.credits} onChangeText={(v) => setForm((f) => ({ ...f, credits: v }))} />
             <Select
-              label="Department"
-              value={form.departmentCode}
-              onChange={(v) => setForm((f) => ({ ...f, departmentCode: v }))}
-              options={departmentOptions}
+              label="Faculty"
+              value={form.facultyId}
+              onChange={(v) => setForm((f) => ({ ...f, facultyId: v }))}
+              options={[{ label: 'Unassigned', value: '' }, ...(facultyCandidates ?? []).map((c) => ({ label: c.fullName, value: c.id }))]}
+            />
+            <Select label="Department" value={form.departmentId} onChange={handleDepartmentChange} options={departmentOptions} />
+            <Select
+              label="Program"
+              value={form.programId}
+              onChange={handleProgramChange}
+              options={programsForDept(form.departmentId).map((p) => ({ label: p.name, value: p.id }))}
+            />
+            <Select
+              label="Semester"
+              value={form.semesterId}
+              onChange={(v) => setForm((f) => ({ ...f, semesterId: v }))}
+              options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
           </div>
-          <TextField label="Faculty" value={form.faculty} onChangeText={(v) => setForm((f) => ({ ...f, faculty: v }))} />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add subject'} size="sm" loading={saving} onClick={handleSave} />

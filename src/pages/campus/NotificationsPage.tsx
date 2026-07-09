@@ -1,57 +1,113 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
-import type { NotificationItem } from '../../data/types';
+import type { NotificationItem, Role } from '../../data/types';
 import { formatRelative } from '../../lib';
-import { PageHeader, Button, Card, Table, type Column, TextField, Select, Badge, Banner, Loading, EmptyState } from '../../components';
+import {
+  PageHeader,
+  Button,
+  Card,
+  Table,
+  type Column,
+  TextField,
+  Select,
+  SearchableSelect,
+  Chip,
+  Badge,
+  Banner,
+  Loading,
+  EmptyState,
+} from '../../components';
 
-const categoryOptions = [
+type Mode = 'direct' | 'broadcast';
+
+const categoryOptions: { label: string; value: NotificationItem['category'] }[] = [
   { label: 'Academic', value: 'academic' },
   { label: 'Fee', value: 'fee' },
   { label: 'Event', value: 'event' },
   { label: 'General', value: 'general' },
   { label: 'Alert', value: 'alert' },
+  { label: 'Attendance', value: 'attendance' },
 ];
 
-const audienceOptions = [
-  { label: 'All', value: 'all' },
+const categoryTone: Record<NotificationItem['category'], 'create' | 'update' | 'delete' | 'broadcast' | 'neutral'> = {
+  academic: 'update',
+  fee: 'broadcast',
+  event: 'create',
+  general: 'neutral',
+  alert: 'delete',
+  attendance: 'update',
+};
+
+const roleOptions: { label: string; value: Role | '' }[] = [
+  { label: 'All roles', value: '' },
   { label: 'Student', value: 'student' },
   { label: 'Parent', value: 'parent' },
   { label: 'Faculty', value: 'faculty' },
   { label: 'HOD', value: 'hod' },
-  { label: 'Principal', value: 'principal' },
   { label: 'Admin', value: 'admin' },
 ];
 
 const emptyForm = {
+  recipientId: '',
+  role: '' as Role | '',
   title: '',
   body: '',
   category: 'general' as NotificationItem['category'],
-  audience: 'all' as NotificationItem['audience'],
 };
 
 export function NotificationsPage() {
   const { data: rows, loading, reload } = useAsync(() => adminService.notifications.list(), []);
+  const { data: recipients } = useAsync(() => adminService.notifications.recipientCandidates(), []);
 
+  const [mode, setMode] = useState<Mode>('direct');
   const [form, setForm] = useState(emptyForm);
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  async function handleBroadcast() {
+  const recipientOptions = (recipients ?? []).map((r) => ({ label: `${r.name} (${r.role})`, value: r.id }));
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setFormError(undefined);
+  }
+
+  async function handleSend() {
     if (!form.title.trim() || !form.body.trim()) {
       setFormError('Title and body are required');
+      return;
+    }
+    if (mode === 'direct' && !form.recipientId) {
+      setFormError('Select a recipient');
       return;
     }
     setSending(true);
     setFormError(undefined);
     try {
-      await adminService.notifications.broadcast(form);
-      setSuccessMsg(`Broadcast "${form.title}" sent`);
+      if (mode === 'direct') {
+        const recipient = recipients?.find((r) => r.id === form.recipientId);
+        await adminService.notifications.send({
+          recipientId: form.recipientId,
+          recipientName: recipient?.name ?? '',
+          title: form.title,
+          body: form.body,
+          category: form.category,
+        });
+        setSuccessMsg(`Sent "${form.title}" to ${recipient?.name ?? 'recipient'}`);
+      } else {
+        await adminService.notifications.broadcast({
+          title: form.title,
+          body: form.body,
+          category: form.category,
+          role: form.role || undefined,
+        });
+        setSuccessMsg(`Broadcast "${form.title}" sent to ${form.role || 'everyone'}`);
+      }
       setForm(emptyForm);
       reload();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not send broadcast');
+      setFormError(err instanceof Error ? err.message : 'Could not send notification');
     } finally {
       setSending(false);
     }
@@ -59,14 +115,18 @@ export function NotificationsPage() {
 
   const columns: Column<NotificationItem>[] = [
     { key: 'title', header: 'Title', render: (n) => <span className="font-semibold text-ink">{n.title}</span> },
-    { key: 'category', header: 'Category', render: (n) => <Badge tone="neutral" label={n.category} /> },
-    { key: 'audience', header: 'Audience', render: (n) => n.audience },
+    { key: 'category', header: 'Category', render: (n) => <Badge tone={categoryTone[n.category]} label={n.category} /> },
+    {
+      key: 'target',
+      header: 'Recipient',
+      render: (n) => (n.recipientName ? n.recipientName : `Broadcast: ${n.broadcastRole || 'everyone'}`),
+    },
     { key: 'sentAt', header: 'Sent', render: (n) => formatRelative(n.sentAt) },
   ];
 
   return (
     <div>
-      <PageHeader title="Notifications" subtitle="Broadcast announcements to the campus" />
+      <PageHeader title="Notifications" subtitle="Send direct messages or broadcast announcements" />
 
       {successMsg && (
         <div className="mb-4">
@@ -76,25 +136,49 @@ export function NotificationsPage() {
 
       <Card className="mb-6">
         <div className="flex flex-col gap-4">
+          <div className="flex gap-2">
+            <Chip label="Direct to user" selected={mode === 'direct'} onClick={() => switchMode('direct')} />
+            <Chip label="Broadcast by role" selected={mode === 'broadcast'} onClick={() => switchMode('broadcast')} />
+          </div>
+
           {formError && <Banner tone="danger" title={formError} />}
+
+          {mode === 'direct' ? (
+            <SearchableSelect
+              label="Recipient"
+              value={form.recipientId}
+              onChange={(v) => setForm((f) => ({ ...f, recipientId: v }))}
+              options={recipientOptions}
+              placeholder="Search by name…"
+            />
+          ) : (
+            <Select
+              label="Broadcast to role"
+              value={form.role}
+              onChange={(v) => setForm((f) => ({ ...f, role: v as Role | '' }))}
+              options={roleOptions}
+            />
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
-            <TextField label="Body" value={form.body} onChangeText={(v) => setForm((f) => ({ ...f, body: v }))} />
             <Select
               label="Category"
               value={form.category}
               onChange={(v) => setForm((f) => ({ ...f, category: v as NotificationItem['category'] }))}
               options={categoryOptions}
             />
-            <Select
-              label="Audience"
-              value={form.audience}
-              onChange={(v) => setForm((f) => ({ ...f, audience: v as NotificationItem['audience'] }))}
-              options={audienceOptions}
-            />
           </div>
+          <TextField label="Body" value={form.body} onChangeText={(v) => setForm((f) => ({ ...f, body: v }))} />
+
           <div className="flex justify-end">
-            <Button label="Broadcast" icon="check" size="sm" loading={sending} onClick={handleBroadcast} />
+            <Button
+              label={mode === 'direct' ? 'Send' : 'Broadcast'}
+              icon="check"
+              size="sm"
+              loading={sending}
+              onClick={handleSend}
+            />
           </div>
         </div>
       </Card>
@@ -104,7 +188,7 @@ export function NotificationsPage() {
       {loading ? (
         <Loading />
       ) : !rows || rows.length === 0 ? (
-        <EmptyState icon="alert" title="No notifications sent yet" />
+        <EmptyState icon="notification" title="No notifications sent yet" />
       ) : (
         <Table columns={columns} rows={rows} />
       )}

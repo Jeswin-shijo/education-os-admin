@@ -8,21 +8,38 @@ import {
   Table,
   type Column,
   Modal,
-  TextField,
+  Select,
   ConfirmDialog,
   Banner,
   Loading,
   EmptyState,
 } from '../../components';
 
+// Standard department code/name presets — keeps entries consistent instead of free text.
+const DEPARTMENT_PRESETS = [
+  { code: 'CSE', name: 'Computer Science & Engineering' },
+  { code: 'ECE', name: 'Electronics & Communication Engineering' },
+  { code: 'EEE', name: 'Electrical & Electronics Engineering' },
+  { code: 'MECH', name: 'Mechanical Engineering' },
+  { code: 'CIVIL', name: 'Civil Engineering' },
+  { code: 'IT', name: 'Information Technology' },
+  { code: 'CHEM', name: 'Chemical Engineering' },
+  { code: 'BIOTECH', name: 'Biotechnology' },
+  { code: 'MBA', name: 'Business Administration' },
+  { code: 'MCA', name: 'Computer Applications' },
+];
+
+const NO_HOD = '__none__';
+
 const emptyForm = {
-  code: '',
-  name: '',
-  hod: '',
+  code: DEPARTMENT_PRESETS[0].code,
+  name: DEPARTMENT_PRESETS[0].name,
+  hod: NO_HOD,
 };
 
 export function DepartmentsPage() {
   const { data: rows, loading, reload } = useAsync(() => adminService.departments.list(), []);
+  const { data: hodCandidates } = useAsync(() => adminService.departments.hodCandidates(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
@@ -34,6 +51,10 @@ export function DepartmentsPage() {
   const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string>();
+
+  function hodName(id?: string): string | undefined {
+    return hodCandidates?.find((c) => c.id === id)?.fullName;
+  }
 
   function openCreate() {
     setEditing(null);
@@ -47,10 +68,20 @@ export function DepartmentsPage() {
     setForm({
       code: d.code,
       name: d.name,
-      hod: d.hod ?? '',
+      hod: d.hod ?? NO_HOD,
     });
     setFormError(undefined);
     setModalOpen(true);
+  }
+
+  function handleCodeChange(code: string) {
+    const preset = DEPARTMENT_PRESETS.find((p) => p.code === code);
+    setForm((f) => ({ ...f, code, name: preset?.name ?? f.name }));
+  }
+
+  function handleNameChange(name: string) {
+    const preset = DEPARTMENT_PRESETS.find((p) => p.name === name);
+    setForm((f) => ({ ...f, name, code: preset?.code ?? f.code }));
   }
 
   async function handleSave() {
@@ -64,7 +95,7 @@ export function DepartmentsPage() {
       const payload = {
         code: form.code,
         name: form.name,
-        hod: form.hod.trim() || undefined,
+        hod: form.hod === NO_HOD ? undefined : form.hod,
       };
       if (editing) {
         await adminService.departments.update(editing.id, payload);
@@ -100,7 +131,7 @@ export function DepartmentsPage() {
   const columns: Column<Department>[] = [
     { key: 'code', header: 'Code', render: (d) => <span className="font-semibold text-ink">{d.code}</span> },
     { key: 'name', header: 'Name', render: (d) => d.name },
-    { key: 'hod', header: 'HOD', render: (d) => d.hod || <span className="text-ink-soft">—</span> },
+    { key: 'hod', header: 'HOD', render: (d) => hodName(d.hod) ?? <span className="text-ink-soft">—</span> },
     {
       key: 'actions',
       header: '',
@@ -140,10 +171,28 @@ export function DepartmentsPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Code" value={form.code} onChangeText={(v) => setForm((f) => ({ ...f, code: v }))} />
-            <TextField label="Name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
+            <Select
+              label="Code"
+              value={form.code}
+              onChange={handleCodeChange}
+              options={DEPARTMENT_PRESETS.map((p) => ({ label: p.code, value: p.code }))}
+            />
+            <Select
+              label="Name"
+              value={form.name}
+              onChange={handleNameChange}
+              options={DEPARTMENT_PRESETS.map((p) => ({ label: p.name, value: p.name }))}
+            />
           </div>
-          <TextField label="HOD (optional)" value={form.hod} onChangeText={(v) => setForm((f) => ({ ...f, hod: v }))} />
+          <Select
+            label="HOD (optional)"
+            value={form.hod}
+            onChange={(v) => setForm((f) => ({ ...f, hod: v }))}
+            options={[
+              { label: '— None —', value: NO_HOD },
+              ...(hodCandidates ?? []).map((c) => ({ label: `${c.fullName} (${c.role})`, value: c.id })),
+            ]}
+          />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add department'} size="sm" loading={saving} onClick={handleSave} />

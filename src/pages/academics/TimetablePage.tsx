@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { groupBy, keyBy } from '../../lib';
-import type { ClassSession, Weekday } from '../../data/types';
+import type { ClassSession, Section, Weekday } from '../../data/types';
 import {
   PageHeader,
   Button,
@@ -33,8 +33,8 @@ function emptyFormFor(defaultSubjectId: string) {
     start: '',
     end: '',
     room: '',
-    section: '',
-    semester: '1',
+    sectionId: '',
+    facultyId: '',
     type: 'Lecture' as ClassSession['type'],
   };
 }
@@ -42,13 +42,19 @@ function emptyFormFor(defaultSubjectId: string) {
 export function TimetablePage() {
   const { data: rows, loading, reload } = useAsync(() => adminService.timetable.list(), []);
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
+  const { data: facultyCandidates } = useAsync(() => adminService.subjects.facultyCandidates(), []);
+  const { data: allSections } = useAsync(() => adminService.sections.list(), []);
 
   const subjectById = keyBy(subjects ?? [], (s) => s.id);
+  const sectionById = keyBy(allSections ?? [], (s) => s.id);
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} · ${s.name}`, value: s.id }));
+  const facultyName = (id?: string) => facultyCandidates?.find((f) => f.id === id)?.fullName ?? '—';
+  const sectionLabel = (id: string) => (sectionById[id] ? `Section ${sectionById[id].name}` : id);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClassSession | null>(null);
   const [form, setForm] = useState(emptyFormFor(''));
+  const [sectionOptions, setSectionOptions] = useState<Section[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
 
@@ -57,14 +63,34 @@ export function TimetablePage() {
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  function openCreate() {
+  // Section options are scoped to whichever subject is picked — its semester carries the
+  // scope, so there's no separate "Semester" field on this form (matches item 2's feedback).
+  async function loadSectionsForSubject(subjectId: string) {
+    const subject = (subjects ?? []).find((s) => s.id === subjectId);
+    if (!subject) {
+      setSectionOptions([]);
+      return;
+    }
+    const rows = await adminService.sections.list(subject.semesterId);
+    setSectionOptions(rows);
+  }
+
+  async function handleSubjectChange(subjectId: string) {
+    const subject = (subjects ?? []).find((s) => s.id === subjectId);
+    setForm((f) => ({ ...f, subjectId, sectionId: '', facultyId: subject?.facultyId ?? f.facultyId }));
+    await loadSectionsForSubject(subjectId);
+  }
+
+  async function openCreate() {
     setEditing(null);
-    setForm(emptyFormFor(subjects?.[0]?.id ?? ''));
+    const firstSubjectId = subjects?.[0]?.id ?? '';
+    setForm({ ...emptyFormFor(firstSubjectId), facultyId: subjects?.[0]?.facultyId ?? '' });
+    await loadSectionsForSubject(firstSubjectId);
     setFormError(undefined);
     setModalOpen(true);
   }
 
-  function openEdit(s: ClassSession) {
+  async function openEdit(s: ClassSession) {
     setEditing(s);
     setForm({
       subjectId: s.subjectId,
@@ -72,16 +98,17 @@ export function TimetablePage() {
       start: s.start,
       end: s.end,
       room: s.room,
-      section: s.section,
-      semester: String(s.semester),
+      sectionId: s.sectionId,
+      facultyId: s.facultyId ?? '',
       type: s.type,
     });
+    await loadSectionsForSubject(s.subjectId);
     setFormError(undefined);
     setModalOpen(true);
   }
 
   async function handleSave() {
-    if (!form.subjectId || !form.start.trim() || !form.end.trim() || !form.room.trim() || !form.section.trim()) {
+    if (!form.subjectId || !form.start.trim() || !form.end.trim() || !form.room.trim() || !form.sectionId) {
       setFormError('Subject, start/end time, room, and section are required');
       return;
     }
@@ -94,8 +121,9 @@ export function TimetablePage() {
         start: form.start,
         end: form.end,
         room: form.room,
-        section: form.section,
-        semester: Number(form.semester) || 1,
+        sectionId: form.sectionId,
+        facultyId: form.facultyId || undefined,
+        facultyName: form.facultyId ? facultyName(form.facultyId) : undefined,
         type: form.type,
       };
       if (editing) {
@@ -164,7 +192,8 @@ export function TimetablePage() {
                           {subject ? `${subject.code} · ${subject.name}` : s.subjectId}
                         </div>
                         <div className="text-caption text-ink-soft">
-                          {s.start}–{s.end} · Room {s.room} · Section {s.section}
+                          {s.start}–{s.end} · Room {s.room} · {sectionLabel(s.sectionId)}
+                          {s.facultyName ? ` · ${s.facultyName}` : ''}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -187,15 +216,10 @@ export function TimetablePage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit session' : 'Add session'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit session' : 'Add session'} width={520}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <Select
-            label="Subject"
-            value={form.subjectId}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
-            options={subjectOptions}
-          />
+          <Select label="Subject" value={form.subjectId} onChange={handleSubjectChange} options={subjectOptions} />
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="Day"
@@ -212,14 +236,19 @@ export function TimetablePage() {
             <TextField label="Start" placeholder="09:00" value={form.start} onChangeText={(v) => setForm((f) => ({ ...f, start: v }))} />
             <TextField label="End" placeholder="10:00" value={form.end} onChangeText={(v) => setForm((f) => ({ ...f, end: v }))} />
             <TextField label="Room" value={form.room} onChangeText={(v) => setForm((f) => ({ ...f, room: v }))} />
-            <TextField label="Section" value={form.section} onChangeText={(v) => setForm((f) => ({ ...f, section: v }))} />
-            <TextField
-              label="Semester"
-              type="number"
-              value={form.semester}
-              onChangeText={(v) => setForm((f) => ({ ...f, semester: v }))}
+            <Select
+              label="Section"
+              value={form.sectionId}
+              onChange={(v) => setForm((f) => ({ ...f, sectionId: v }))}
+              options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
             />
           </div>
+          <Select
+            label="Faculty"
+            value={form.facultyId}
+            onChange={(v) => setForm((f) => ({ ...f, facultyId: v }))}
+            options={[{ label: 'Unassigned', value: '' }, ...(facultyCandidates ?? []).map((c) => ({ label: c.fullName, value: c.id }))]}
+          />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add session'} size="sm" loading={saving} onClick={handleSave} />

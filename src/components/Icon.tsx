@@ -28,7 +28,17 @@ type IconName =
   | 'notification'
   | 'student'
   | 'faculty'
-  | 'role';
+  | 'role'
+  | 'exam'
+  | 'results'
+  | 'assignment'
+  | 'material'
+  | 'quiz'
+  | 'placement'
+  | 'event'
+  | 'complaint'
+  | 'leave'
+  | 'certificate';
 
 const paths: Record<IconName, string> = {
   search: 'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
@@ -64,6 +74,17 @@ const paths: Record<IconName, string> = {
   student: 'M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5M22 10v6',
   faculty: 'M4 4h16v14a2 2 0 01-2 2H6a2 2 0 01-2-2zM12 11a3 3 0 100-6 3 3 0 000 6zM8 21v-2a4 4 0 018 0v2',
   role: 'M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6zM9.5 12l2 2 3.5-3.5',
+  // Engagement group
+  exam: 'M4 3h16v18l-4-2-4 2-4-2-4 2zM8 8h8M8 12h8M8 16h5',
+  results: 'M4 20V10M10 20V4M16 20v-8M22 20H2',
+  assignment: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12l2 2 4-4',
+  material: 'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5z',
+  quiz: 'M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01M12 22a10 10 0 100-20 10 10 0 000 20z',
+  placement: 'M20 7h-4V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2H4a2 2 0 00-2 2v11a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM10 5h4v2h-4z',
+  event: 'M8 2v3M16 2v3M3 9h18M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM12 12l1.5 3 3 .5-2 2 .5 3-3-1.5-3 1.5.5-3-2-2 3-.5z',
+  complaint: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2zM12 8v3M12 14h.01',
+  leave: 'M8 2v3M16 2v3M3 9h18M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM9 15l2 2 4-4',
+  certificate: 'M12 15a5 5 0 100-10 5 5 0 000 10zM8.5 13.5L7 21l5-2 5 2-1.5-7.5',
 };
 
 export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {

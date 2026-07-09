@@ -1,20 +1,38 @@
 import * as storage from './storage';
 import * as seed from '../data/seed';
 import type {
+  Assignment,
   AuditLog,
   Book,
+  BookLoan,
   BusRoute,
+  BusStop,
+  BusLiveStatus,
+  Certificate,
   ClassSession,
-  Course,
+  Complaint,
   Department,
+  Exam,
+  ExamResult,
   FacultyMember,
   FeeInvoice,
-  HostelInfo,
+  HostelAllocation,
+  HostelBlock,
+  HostelRoom,
+  LeaveRequest,
+  Material,
   NotificationItem,
   ParentAccount,
+  PlacementApplication,
+  PlacementOpening,
   PlatformUser,
+  Program,
+  Quiz,
+  Section,
+  Semester,
   Student,
   Subject,
+  EventItem,
 } from '../data/types';
 
 export type Collections = {
@@ -23,14 +41,33 @@ export type Collections = {
   parents: ParentAccount[];
   platformUsers: PlatformUser[];
   departments: Department[];
-  courses: Course[];
+  programs: Program[];
+  semesters: Semester[];
+  sections: Section[];
   subjects: Subject[];
   sessions: ClassSession[];
   fees: FeeInvoice[];
   books: Book[];
+  bookLoans: BookLoan[];
+  hostelBlocks: HostelBlock[];
+  hostelRooms: HostelRoom[];
+  hostelAllocations: HostelAllocation[];
   busRoutes: BusRoute[];
+  busStops: BusStop[];
+  busLiveStatuses: BusLiveStatus[];
   notifications: NotificationItem[];
   auditLogs: AuditLog[];
+  exams: Exam[];
+  examResults: ExamResult[];
+  assignments: Assignment[];
+  materials: Material[];
+  quizzes: Quiz[];
+  placementOpenings: PlacementOpening[];
+  placementApplications: PlacementApplication[];
+  events: EventItem[];
+  complaints: Complaint[];
+  leaveRequests: LeaveRequest[];
+  certificates: Certificate[];
 };
 
 const collectionNames = [
@@ -39,21 +76,39 @@ const collectionNames = [
   'parents',
   'platformUsers',
   'departments',
-  'courses',
+  'programs',
+  'semesters',
+  'sections',
   'subjects',
   'sessions',
   'fees',
   'books',
+  'bookLoans',
+  'hostelBlocks',
+  'hostelRooms',
+  'hostelAllocations',
   'busRoutes',
+  'busStops',
+  'busLiveStatuses',
   'notifications',
   'auditLogs',
+  'exams',
+  'examResults',
+  'assignments',
+  'materials',
+  'quizzes',
+  'placementOpenings',
+  'placementApplications',
+  'events',
+  'complaints',
+  'leaveRequests',
+  'certificates',
 ] as const satisfies readonly (keyof Collections)[];
 
-const SEEDED_FLAG = 'seeded';
-const HOSTEL_KEY = 'hostel';
+const SEEDED_FLAG = 'seeded-v2';
 
 function seedDefault<K extends keyof Collections>(name: K): Collections[K] {
-  return (seed as unknown as Collections)[name];
+  return (seed as unknown as Collections)[name] ?? [];
 }
 
 export async function seedIfEmpty(): Promise<void> {
@@ -61,7 +116,6 @@ export async function seedIfEmpty(): Promise<void> {
   for (const name of collectionNames) {
     storage.setJSON(name, seedDefault(name));
   }
-  storage.setJSON(HOSTEL_KEY, seed.hostel);
   storage.setJSON(SEEDED_FLAG, true);
 }
 
@@ -94,18 +148,8 @@ export async function removeById<K extends keyof Collections>(name: K, id: strin
   await write(name, filtered);
 }
 
-export async function readHostel(): Promise<HostelInfo> {
-  await seedIfEmpty();
-  return storage.getJSON<HostelInfo>(HOSTEL_KEY) ?? seed.hostel;
-}
-
-export async function writeHostel(info: HostelInfo): Promise<void> {
-  storage.setJSON(HOSTEL_KEY, info);
-}
-
 export async function resetAll(): Promise<void> {
   for (const name of collectionNames) storage.remove(name);
-  storage.remove(HOSTEL_KEY);
   storage.remove(SEEDED_FLAG);
   await seedIfEmpty();
 }

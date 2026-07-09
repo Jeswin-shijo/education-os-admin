@@ -21,10 +21,22 @@ const groups: NavGroup[] = [
     title: 'Academics',
     items: [
       { to: '/departments', label: 'Departments', icon: 'department' },
-      { to: '/courses', label: 'Courses', icon: 'course' },
+      { to: '/programs', label: 'Programs', icon: 'course' },
+      { to: '/semesters', label: 'Semesters', icon: 'timetable' },
+      { to: '/sections', label: 'Sections', icon: 'subject' },
       { to: '/subjects', label: 'Subjects', icon: 'subject' },
       { to: '/timetable', label: 'Timetable', icon: 'timetable' },
       { to: '/attendance', label: 'Attendance', icon: 'attendance' },
+    ],
+  },
+  {
+    title: 'Academic Content',
+    items: [
+      { to: '/exams', label: 'Exams', icon: 'exam' },
+      { to: '/results', label: 'Results', icon: 'results' },
+      { to: '/assignments', label: 'Assignments', icon: 'assignment' },
+      { to: '/materials', label: 'Materials', icon: 'material' },
+      { to: '/quizzes', label: 'Quizzes', icon: 'quiz' },
     ],
   },
   {
@@ -35,6 +47,16 @@ const groups: NavGroup[] = [
       { to: '/hostel', label: 'Hostel', icon: 'hostel' },
       { to: '/transport', label: 'Transport', icon: 'transport' },
       { to: '/notifications', label: 'Notifications', icon: 'notification' },
+    ],
+  },
+  {
+    title: 'Student Life',
+    items: [
+      { to: '/placements', label: 'Placements', icon: 'placement' },
+      { to: '/events', label: 'Events', icon: 'event' },
+      { to: '/complaints', label: 'Complaints', icon: 'complaint' },
+      { to: '/leave', label: 'Leave', icon: 'leave' },
+      { to: '/certificates', label: 'Certificates', icon: 'certificate' },
     ],
   },
   { items: [{ to: '/audit-logs', label: 'Audit Logs', icon: 'audit' }] },

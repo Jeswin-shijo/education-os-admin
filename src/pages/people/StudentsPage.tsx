@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
-import type { Student } from '../../data/types';
+import type { Section, Semester, Student } from '../../data/types';
 import { minLen, required, composeValidators } from '../../lib/validation';
 import { toLocalISODate } from '../../lib/date';
 import {
@@ -24,8 +24,6 @@ import {
 const NAVY = '#13327F';
 const MAX_PHOTO_BYTES = 800 * 1024; // keep localStorage-friendly
 
-const PROGRAM_OPTIONS = ['B.Tech', 'M.Tech', 'BCA', 'MCA', 'BSc', 'MSc', 'MBA', 'PhD'];
-const SECTION_OPTIONS = ['A', 'B', 'C', 'D'];
 const GENDER_OPTIONS: Student['gender'][] = ['Male', 'Female', 'Other'];
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -35,10 +33,10 @@ const emptyForm = {
   admissionNo: '',
   email: '',
   phone: '',
-  program: PROGRAM_OPTIONS[0],
-  branch: '',
-  semester: '1',
-  section: SECTION_OPTIONS[0],
+  departmentId: '',
+  programId: '',
+  semesterId: '',
+  sectionId: '',
   year: '1',
   cgpa: '0',
   mentorName: '',
@@ -55,10 +53,13 @@ export function StudentsPage() {
   const [q, setQ] = useState('');
   const { data: rows, loading, reload } = useAsync(() => adminService.students.list(q), [q]);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
+  const { data: allPrograms } = useAsync(() => adminService.programs.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [semesterOptions, setSemesterOptions] = useState<Semester[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<Section[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [photoError, setPhotoError] = useState<string>();
@@ -68,28 +69,48 @@ export function StudentsPage() {
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  const branchOptions = departments && departments.length > 0 ? departments.map((d) => d.code) : ['CSE'];
+  const departmentName = (id: string) => departments?.find((d) => d.id === id)?.code ?? '—';
+  const programsForDept = (departmentId: string) => (allPrograms ?? []).filter((p) => p.departmentId === departmentId);
 
-  function openCreate() {
+  async function loadSemesters(programId: string) {
+    const rows = programId ? await adminService.semesters.list(programId) : [];
+    setSemesterOptions(rows);
+    return rows;
+  }
+
+  async function loadSections(semesterId: string) {
+    const rows = semesterId ? await adminService.sections.list(semesterId) : [];
+    setSectionOptions(rows);
+    return rows;
+  }
+
+  async function openCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, branch: branchOptions[0] });
+    const firstDept = departments?.[0]?.id ?? '';
+    const firstProgram = programsForDept(firstDept)[0]?.id ?? '';
+    const sems = await loadSemesters(firstProgram);
+    const firstSemester = sems[0]?.id ?? '';
+    const secs = await loadSections(firstSemester);
+    setForm({ ...emptyForm, departmentId: firstDept, programId: firstProgram, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' });
     setFormError(undefined);
     setPhotoError(undefined);
     setModalOpen(true);
   }
 
-  function openEdit(s: Student) {
+  async function openEdit(s: Student) {
     setEditing(s);
+    await loadSemesters(s.programId);
+    await loadSections(s.semesterId);
     setForm({
       name: s.name,
       rollNo: s.rollNo,
       admissionNo: s.admissionNo,
       email: s.email,
       phone: s.phone,
-      program: s.program,
-      branch: s.branch,
-      semester: String(s.semester),
-      section: s.section,
+      departmentId: s.departmentId,
+      programId: s.programId,
+      semesterId: s.semesterId,
+      sectionId: s.sectionId,
       year: String(s.year),
       cgpa: String(s.cgpa),
       mentorName: s.mentorName,
@@ -102,6 +123,26 @@ export function StudentsPage() {
     setFormError(undefined);
     setPhotoError(undefined);
     setModalOpen(true);
+  }
+
+  async function handleDepartmentChange(departmentId: string) {
+    const firstProgram = programsForDept(departmentId)[0]?.id ?? '';
+    const sems = await loadSemesters(firstProgram);
+    const firstSemester = sems[0]?.id ?? '';
+    const secs = await loadSections(firstSemester);
+    setForm((f) => ({ ...f, departmentId, programId: firstProgram, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' }));
+  }
+
+  async function handleProgramChange(programId: string) {
+    const sems = await loadSemesters(programId);
+    const firstSemester = sems[0]?.id ?? '';
+    const secs = await loadSections(firstSemester);
+    setForm((f) => ({ ...f, programId, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' }));
+  }
+
+  async function handleSemesterChange(semesterId: string) {
+    const secs = await loadSections(semesterId);
+    setForm((f) => ({ ...f, semesterId, sectionId: secs[0]?.id ?? '' }));
   }
 
   function handlePhotoChange(file: File | undefined) {
@@ -117,8 +158,8 @@ export function StudentsPage() {
   }
 
   async function handleSave() {
-    if (!form.name.trim() || !form.rollNo.trim() || !form.email.trim()) {
-      setFormError('Name, roll number, and email are required');
+    if (!form.name.trim() || !form.rollNo.trim() || !form.email.trim() || !form.departmentId || !form.programId || !form.semesterId || !form.sectionId) {
+      setFormError('Name, roll number, email, department, program, semester, and section are required');
       return;
     }
     if (!editing) {
@@ -137,10 +178,10 @@ export function StudentsPage() {
         admissionNo: form.admissionNo,
         email: form.email,
         phone: form.phone,
-        program: form.program,
-        branch: form.branch,
-        semester: Number(form.semester) || 1,
-        section: form.section,
+        departmentId: form.departmentId,
+        programId: form.programId,
+        semesterId: form.semesterId,
+        sectionId: form.sectionId,
         year: Number(form.year) || 1,
         cgpa: Number(form.cgpa) || 0,
         avatarColor: editing?.avatarColor ?? NAVY,
@@ -154,10 +195,7 @@ export function StudentsPage() {
         await adminService.students.update(editing.id, payload);
         setSuccessMsg(`Updated ${payload.name}`);
       } else {
-        // `form.password` would be sent to the account-registration endpoint once this
-        // console is wired to the real backend (POST /api/v1/auth/register); the mock
-        // service has no login system to create it against yet.
-        await adminService.students.create(payload);
+        await adminService.students.create({ ...payload, password: form.password });
         setSuccessMsg(`Added ${payload.name}`);
       }
       setModalOpen(false);
@@ -199,7 +237,7 @@ export function StudentsPage() {
       ),
     },
     { key: 'rollNo', header: 'Roll No.', render: (s) => s.rollNo },
-    { key: 'branch', header: 'Branch', render: (s) => `${s.branch} · Sem ${s.semester}${s.section}` },
+    { key: 'branch', header: 'Branch', render: (s) => departmentName(s.departmentId) },
     { key: 'cgpa', header: 'CGPA', render: (s) => s.cgpa.toFixed(1) },
     {
       key: 'actions',
@@ -286,24 +324,29 @@ export function StudentsPage() {
               maxDate={toLocalISODate(new Date())}
             />
             <Select
-              label="Program"
-              value={form.program}
-              onChange={(v) => setForm((f) => ({ ...f, program: v }))}
-              options={PROGRAM_OPTIONS.map((p) => ({ label: p, value: p }))}
+              label="Department"
+              value={form.departmentId}
+              onChange={handleDepartmentChange}
+              options={(departments ?? []).map((d) => ({ label: d.name, value: d.id }))}
             />
             <Select
-              label="Branch"
-              value={form.branch}
-              onChange={(v) => setForm((f) => ({ ...f, branch: v }))}
-              options={branchOptions.map((code) => ({ label: code, value: code }))}
+              label="Program"
+              value={form.programId}
+              onChange={handleProgramChange}
+              options={programsForDept(form.departmentId).map((p) => ({ label: p.name, value: p.id }))}
+            />
+            <Select
+              label="Semester"
+              value={form.semesterId}
+              onChange={handleSemesterChange}
+              options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
             <Select
               label="Section"
-              value={form.section}
-              onChange={(v) => setForm((f) => ({ ...f, section: v }))}
-              options={SECTION_OPTIONS.map((s) => ({ label: s, value: s }))}
+              value={form.sectionId}
+              onChange={(v) => setForm((f) => ({ ...f, sectionId: v }))}
+              options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
             />
-            <TextField label="Semester" type="number" value={form.semester} onChangeText={(v) => setForm((f) => ({ ...f, semester: v }))} />
             <TextField label="Year" type="number" value={form.year} onChangeText={(v) => setForm((f) => ({ ...f, year: v }))} />
             <TextField label="CGPA" type="number" value={form.cgpa} onChangeText={(v) => setForm((f) => ({ ...f, cgpa: v }))} />
             <Select

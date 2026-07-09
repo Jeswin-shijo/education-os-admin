@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
-import type { FeeInvoice } from '../../data/types';
+import type { FeeInvoice, PaymentMethod } from '../../data/types';
 import { formatINR, formatDate } from '../../lib';
 import {
   PageHeader,
@@ -12,26 +12,30 @@ import {
   Modal,
   TextField,
   Select,
+  SearchableSelect,
   DatePicker,
   StatusPill,
   Banner,
   Loading,
   EmptyState,
+  Icon,
 } from '../../components';
 
-const emptyForm = {
-  studentId: '',
-  studentName: '',
-  title: '',
-  term: '',
-  amount: '0',
-  dueDate: '',
-};
+type LineItem = { key: number; title: string; term: string; amount: string; dueDate: string };
+
+let lineKeySeq = 0;
+function newLine(): LineItem {
+  lineKeySeq += 1;
+  return { key: lineKeySeq, title: '', term: '', amount: '0', dueDate: '' };
+}
+
+const PAYMENT_METHODS: PaymentMethod[] = ['upi', 'card', 'netbanking', 'cash', 'cheque', 'other'];
 
 const statusTone: Record<FeeInvoice['status'], 'success' | 'info' | 'danger'> = {
   paid: 'success',
   due: 'info',
   overdue: 'danger',
+  pending: 'info',
 };
 
 export function FeesPage() {
@@ -40,53 +44,84 @@ export function FeesPage() {
   const { data: students } = useAsync(() => adminService.students.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [studentId, setStudentId] = useState('');
+  const [lines, setLines] = useState<LineItem[]>([newLine()]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
-  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const [paymentTarget, setPaymentTarget] = useState<FeeInvoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string>();
+
+  const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
 
   function openCreate() {
-    setForm(emptyForm);
+    setStudentId('');
+    setLines([newLine()]);
     setFormError(undefined);
     setModalOpen(true);
   }
 
+  function updateLine(key: number, patch: Partial<LineItem>) {
+    setLines((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
   async function handleSave() {
-    if (!form.studentId || !form.title.trim() || !form.term.trim() || !form.dueDate) {
-      setFormError('Student, title, term, and due date are required');
+    const student = students?.find((s) => s.id === studentId);
+    if (!student) {
+      setFormError('Select a student');
+      return;
+    }
+    const incomplete = lines.some((l) => !l.title.trim() || !l.term.trim() || !l.dueDate);
+    if (incomplete) {
+      setFormError('Every invoice line needs a title, term, and due date');
       return;
     }
     setSaving(true);
     setFormError(undefined);
     try {
-      const payload = {
-        studentId: form.studentId,
-        studentName: form.studentName,
-        title: form.title,
-        term: form.term,
-        amount: Number(form.amount) || 0,
-        dueDate: new Date(form.dueDate).toISOString(),
-        status: 'due' as const,
-      };
-      await adminService.fees.create(payload);
-      setSuccessMsg(`Added invoice "${payload.title}"`);
+      await adminService.fees.createBatch(
+        lines.map((l) => ({
+          studentId: student.id,
+          studentName: student.name,
+          title: l.title,
+          term: l.term,
+          amount: Number(l.amount) || 0,
+          dueDate: new Date(l.dueDate).toISOString(),
+        })),
+      );
+      setSuccessMsg(`Added ${lines.length} invoice${lines.length > 1 ? 's' : ''} for ${student.name}`);
       setModalOpen(false);
       reload();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save invoice');
+      setFormError(err instanceof Error ? err.message : 'Could not save invoices');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleMarkPaid(id: string) {
-    setMarkingId(id);
+  function openPayment(invoice: FeeInvoice) {
+    setPaymentTarget(invoice);
+    setPaymentMethod('cash');
+    setPaymentReference('');
+    setPaymentError(undefined);
+  }
+
+  async function handleRecordPayment() {
+    if (!paymentTarget) return;
+    setPaying(true);
+    setPaymentError(undefined);
     try {
-      await adminService.fees.markPaid(id);
+      await adminService.fees.recordPayment(paymentTarget.id, paymentTarget.amount, paymentMethod, paymentReference);
+      setPaymentTarget(null);
       reload();
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Could not record payment');
     } finally {
-      setMarkingId(null);
+      setPaying(false);
     }
   }
 
@@ -116,13 +151,7 @@ export function FeesPage() {
       render: (f) =>
         f.status !== 'paid' ? (
           <div className="flex justify-end">
-            <Button
-              label="Mark paid"
-              variant="outline"
-              size="sm"
-              loading={markingId === f.id}
-              onClick={() => handleMarkPaid(f.id)}
-            />
+            <Button label="Record payment" variant="outline" size="sm" onClick={() => openPayment(f)} />
           </div>
         ) : null,
     },
@@ -154,30 +183,61 @@ export function FeesPage() {
         <Table columns={columns} rows={rows} />
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add invoice">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add invoice(s)" width={560}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <Select
-            label="Student"
-            value={form.studentId}
-            onChange={(v) => {
-              const student = students?.find((s) => s.id === v);
-              setForm((f) => ({ ...f, studentId: v, studentName: student?.name ?? '' }));
-            }}
-            options={[
-              { label: 'Select a student', value: '' },
-              ...(students ?? []).map((s) => ({ label: `${s.name} (${s.rollNo})`, value: s.id })),
-            ]}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
-            <TextField label="Term" value={form.term} onChangeText={(v) => setForm((f) => ({ ...f, term: v }))} />
-            <TextField label="Amount" type="number" value={form.amount} onChangeText={(v) => setForm((f) => ({ ...f, amount: v }))} />
-            <DatePicker label="Due date" value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
+          <SearchableSelect label="Student" value={studentId} onChange={setStudentId} options={studentOptions} placeholder="Search by name or roll no…" />
+
+          <div className="flex flex-col gap-3">
+            {lines.map((line, i) => (
+              <div key={line.key} className="rounded-lg border border-line-soft p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-label uppercase tracking-wide text-ink-muted">Invoice {i + 1}</span>
+                  {lines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setLines((rows) => rows.filter((r) => r.key !== line.key))}
+                      className="text-ink-soft hover:text-danger"
+                      aria-label="Remove invoice line"
+                    >
+                      <Icon name="trash" size={16} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <TextField label="Title" value={line.title} onChangeText={(v) => updateLine(line.key, { title: v })} />
+                  <TextField label="Term" value={line.term} onChangeText={(v) => updateLine(line.key, { term: v })} />
+                  <TextField label="Amount" type="number" value={line.amount} onChangeText={(v) => updateLine(line.key, { amount: v })} />
+                  <DatePicker label="Due date" value={line.dueDate} onChange={(v) => updateLine(line.key, { dueDate: v })} />
+                </div>
+              </div>
+            ))}
+            <Button label="Add another invoice" icon="plus" variant="outline" size="sm" onClick={() => setLines((rows) => [...rows, newLine()])} />
           </div>
+
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
-            <Button label="Add invoice" size="sm" loading={saving} onClick={handleSave} />
+            <Button label={lines.length > 1 ? `Add ${lines.length} invoices` : 'Add invoice'} size="sm" loading={saving} onClick={handleSave} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!paymentTarget} onClose={() => setPaymentTarget(null)} title="Record payment">
+        <div className="flex flex-col gap-4">
+          {paymentError && <Banner tone="danger" title={paymentError} />}
+          <div className="text-body text-ink-muted">
+            {paymentTarget?.title} — {paymentTarget && formatINR(paymentTarget.amount)} for {paymentTarget?.studentName}
+          </div>
+          <Select
+            label="Payment method"
+            value={paymentMethod}
+            onChange={(v) => setPaymentMethod(v as PaymentMethod)}
+            options={PAYMENT_METHODS.map((m) => ({ label: m.toUpperCase(), value: m }))}
+          />
+          <TextField label="Reference (optional)" value={paymentReference} onChangeText={setPaymentReference} placeholder="Transaction / cheque no." />
+          <div className="flex justify-end gap-2">
+            <Button label="Cancel" variant="outline" size="sm" onClick={() => setPaymentTarget(null)} />
+            <Button label="Record payment" size="sm" loading={paying} onClick={handleRecordPayment} />
           </div>
         </div>
       </Modal>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
-import type { Course } from '../../data/types';
+import type { Program } from '../../data/types';
 import {
   PageHeader,
   Button,
@@ -21,50 +21,51 @@ const NAVY = '#13327F';
 const emptyForm = {
   code: '',
   name: '',
-  departmentCode: '',
+  departmentId: '',
   durationYears: '4',
   intake: '60',
 };
 
-export function CoursesPage() {
-  const { data: rows, loading, reload } = useAsync(() => adminService.courses.list(), []);
+export function ProgramsPage() {
+  const { data: rows, loading, reload } = useAsync(() => adminService.programs.list(), []);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Course | null>(null);
+  const [editing, setEditing] = useState<Program | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
 
-  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.code }));
+  const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
+  const departmentName = (id: string) => departments?.find((d) => d.id === id)?.name ?? '—';
 
   function openCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, departmentCode: departments?.[0]?.code ?? '' });
+    setForm({ ...emptyForm, departmentId: departments?.[0]?.id ?? '' });
     setFormError(undefined);
     setModalOpen(true);
   }
 
-  function openEdit(c: Course) {
-    setEditing(c);
+  function openEdit(p: Program) {
+    setEditing(p);
     setForm({
-      code: c.code,
-      name: c.name,
-      departmentCode: c.departmentCode,
-      durationYears: String(c.durationYears),
-      intake: String(c.intake),
+      code: p.code,
+      name: p.name,
+      departmentId: p.departmentId,
+      durationYears: String(p.durationYears),
+      intake: String(p.intake),
     });
     setFormError(undefined);
     setModalOpen(true);
   }
 
   async function handleSave() {
-    if (!form.code.trim() || !form.name.trim() || !form.departmentCode.trim()) {
+    if (!form.code.trim() || !form.name.trim() || !form.departmentId) {
       setFormError('Code, name, and department are required');
       return;
     }
@@ -74,22 +75,22 @@ export function CoursesPage() {
       const payload = {
         code: form.code,
         name: form.name,
-        departmentCode: form.departmentCode,
+        departmentId: form.departmentId,
         durationYears: Number(form.durationYears) || 1,
         intake: Number(form.intake) || 0,
         color: editing?.color ?? NAVY,
       };
       if (editing) {
-        await adminService.courses.update(editing.id, payload);
+        await adminService.programs.update(editing.id, payload);
         setSuccessMsg(`Updated ${payload.name}`);
       } else {
-        await adminService.courses.create(payload);
+        await adminService.programs.create(payload);
         setSuccessMsg(`Added ${payload.name}`);
       }
       setModalOpen(false);
       reload();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save course');
+      setFormError(err instanceof Error ? err.message : 'Could not save program');
     } finally {
       setSaving(false);
     }
@@ -100,30 +101,30 @@ export function CoursesPage() {
     setDeleting(true);
     setDeleteError(undefined);
     try {
-      await adminService.courses.remove(deleteTarget.id);
+      await adminService.programs.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove course');
+      setDeleteError(err instanceof Error ? err.message : 'Could not remove program');
     } finally {
       setDeleting(false);
     }
   }
 
-  const columns: Column<Course>[] = [
-    { key: 'code', header: 'Code', render: (c) => <span className="font-semibold text-ink">{c.code}</span> },
-    { key: 'name', header: 'Name', render: (c) => c.name },
-    { key: 'departmentCode', header: 'Department', render: (c) => c.departmentCode },
-    { key: 'durationYears', header: 'Duration', render: (c) => `${c.durationYears} yrs` },
-    { key: 'intake', header: 'Intake', render: (c) => c.intake },
+  const columns: Column<Program>[] = [
+    { key: 'code', header: 'Code', render: (p) => <span className="font-semibold text-ink">{p.code}</span> },
+    { key: 'name', header: 'Name', render: (p) => p.name },
+    { key: 'department', header: 'Department', render: (p) => departmentName(p.departmentId) },
+    { key: 'durationYears', header: 'Duration', render: (p) => `${p.durationYears} yrs` },
+    { key: 'intake', header: 'Intake', render: (p) => p.intake },
     {
       key: 'actions',
       header: '',
       width: '110px',
-      render: (c) => (
+      render: (p) => (
         <div className="flex justify-end gap-1.5">
-          <Button variant="ghost" size="sm" icon="edit" onClick={() => openEdit(c)} />
-          <Button variant="ghost" size="sm" icon="trash" className="text-danger hover:bg-danger-soft" onClick={() => setDeleteTarget(c)} />
+          <Button variant="ghost" size="sm" icon="edit" onClick={() => openEdit(p)} />
+          <Button variant="ghost" size="sm" icon="trash" className="text-danger hover:bg-danger-soft" onClick={() => setDeleteTarget(p)} />
         </div>
       ),
     },
@@ -132,9 +133,9 @@ export function CoursesPage() {
   return (
     <div>
       <PageHeader
-        title="Courses"
-        subtitle={rows ? `${rows.length} courses` : undefined}
-        action={<Button label="Add course" icon="plus" onClick={openCreate} />}
+        title="Programs"
+        subtitle={rows ? `${rows.length} programs` : undefined}
+        action={<Button label="Add program" icon="plus" onClick={openCreate} />}
       />
 
       {successMsg && (
@@ -146,12 +147,12 @@ export function CoursesPage() {
       {loading ? (
         <Loading />
       ) : !rows || rows.length === 0 ? (
-        <EmptyState icon="academics" title="No courses found" actionLabel="Add course" onAction={openCreate} />
+        <EmptyState icon="academics" title="No programs found" actionLabel="Add program" onAction={openCreate} />
       ) : (
         <Table columns={columns} rows={rows} />
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit course' : 'Add course'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit program' : 'Add program'}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
@@ -159,8 +160,8 @@ export function CoursesPage() {
             <TextField label="Name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
             <Select
               label="Department"
-              value={form.departmentCode}
-              onChange={(v) => setForm((f) => ({ ...f, departmentCode: v }))}
+              value={form.departmentId}
+              onChange={(v) => setForm((f) => ({ ...f, departmentId: v }))}
               options={departmentOptions}
             />
             <TextField
@@ -173,7 +174,7 @@ export function CoursesPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
-            <Button label={editing ? 'Save changes' : 'Add course'} size="sm" loading={saving} onClick={handleSave} />
+            <Button label={editing ? 'Save changes' : 'Add program'} size="sm" loading={saving} onClick={handleSave} />
           </div>
         </div>
       </Modal>
@@ -185,7 +186,7 @@ export function CoursesPage() {
           setDeleteError(undefined);
         }}
         onConfirm={handleDelete}
-        title="Remove course"
+        title="Remove program"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
         error={deleteError}

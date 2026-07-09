@@ -1,84 +1,180 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
-import type { BusRoute } from '../../data/types';
-import { PageHeader, Button, Table, type Column, Modal, TextField, Banner, Loading, EmptyState } from '../../components';
+import type { BusLiveStatus, BusRoute, BusStop } from '../../data/types';
+import {
+  PageHeader,
+  Button,
+  Table,
+  type Column,
+  Modal,
+  TextField,
+  Select,
+  Chip,
+  Banner,
+  Loading,
+  EmptyState,
+} from '../../components';
 
-const emptyForm = {
-  name: '',
-  number: '',
-  driver: '',
-  driverPhone: '',
-};
+type Tab = 'routes' | 'stops' | 'liveStatus';
+
+const emptyRouteForm = { name: '', number: '', driver: '', driverPhone: '' };
+const emptyStopForm = { routeId: '', name: '', time: '', order: '1' };
+const emptyLiveStatusForm = { routeId: '', currentStop: '', nextStop: '', etaMins: '5', occupancy: '0' };
 
 export function TransportPage() {
-  const { data: rows, loading, reload } = useAsync(() => adminService.transport.list(), []);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<BusRoute | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string>();
+  const [tab, setTab] = useState<Tab>('routes');
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  function openCreate() {
-    setEditing(null);
-    setForm(emptyForm);
-    setFormError(undefined);
-    setModalOpen(true);
+  const { data: routes, loading: routesLoading, reload: reloadRoutes } = useAsync(() => adminService.transport.routes.list(), []);
+  const { data: stops, loading: stopsLoading, reload: reloadStops } = useAsync(() => adminService.transport.stops.list(), []);
+  const {
+    data: liveStatuses,
+    loading: liveStatusLoading,
+    reload: reloadLiveStatus,
+  } = useAsync(() => adminService.transport.liveStatus.list(), []);
+
+  const routeName = (id: string) => routes?.find((r) => r.id === id)?.name ?? '—';
+
+  // Route modal
+  const [routeModalOpen, setRouteModalOpen] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<BusRoute | null>(null);
+  const [routeForm, setRouteForm] = useState(emptyRouteForm);
+  const [routeSaving, setRouteSaving] = useState(false);
+  const [routeFormError, setRouteFormError] = useState<string>();
+
+  function openCreateRoute() {
+    setEditingRoute(null);
+    setRouteForm(emptyRouteForm);
+    setRouteFormError(undefined);
+    setRouteModalOpen(true);
   }
 
-  function openEdit(r: BusRoute) {
-    setEditing(r);
-    setForm({
-      name: r.name,
-      number: r.number,
-      driver: r.driver,
-      driverPhone: r.driverPhone,
-    });
-    setFormError(undefined);
-    setModalOpen(true);
+  function openEditRoute(r: BusRoute) {
+    setEditingRoute(r);
+    setRouteForm({ name: r.name, number: r.number, driver: r.driver, driverPhone: r.driverPhone });
+    setRouteFormError(undefined);
+    setRouteModalOpen(true);
   }
 
-  async function handleSave() {
-    if (!form.name.trim() || !form.number.trim()) {
-      setFormError('Route name and number are required');
+  async function handleSaveRoute() {
+    if (!routeForm.name.trim() || !routeForm.number.trim()) {
+      setRouteFormError('Route name and number are required');
       return;
     }
-    setSaving(true);
-    setFormError(undefined);
+    setRouteSaving(true);
+    setRouteFormError(undefined);
     try {
-      if (editing) {
-        const payload = {
-          ...editing,
-          name: form.name,
-          number: form.number,
-          driver: form.driver,
-          driverPhone: form.driverPhone,
-        };
-        await adminService.transport.update(editing.id, payload);
-        setSuccessMsg(`Updated route "${payload.name}"`);
+      if (editingRoute) {
+        await adminService.transport.routes.update(editingRoute.id, {
+          name: routeForm.name,
+          number: routeForm.number,
+          driver: routeForm.driver,
+          driverPhone: routeForm.driverPhone,
+        });
+        setSuccessMsg(`Updated route "${routeForm.name}"`);
       } else {
-        const payload = {
-          name: form.name,
-          number: form.number,
-          driver: form.driver,
-          driverPhone: form.driverPhone,
-          stops: [],
-        };
-        await adminService.transport.create(payload);
-        setSuccessMsg(`Added route "${payload.name}"`);
+        await adminService.transport.routes.create({
+          name: routeForm.name,
+          number: routeForm.number,
+          driver: routeForm.driver,
+          driverPhone: routeForm.driverPhone,
+        });
+        setSuccessMsg(`Added route "${routeForm.name}"`);
       }
-      setModalOpen(false);
-      reload();
+      setRouteModalOpen(false);
+      reloadRoutes();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save route');
+      setRouteFormError(err instanceof Error ? err.message : 'Could not save route');
     } finally {
-      setSaving(false);
+      setRouteSaving(false);
     }
   }
 
-  const columns: Column<BusRoute>[] = [
+  // Stop modal
+  const [stopModalOpen, setStopModalOpen] = useState(false);
+  const [stopForm, setStopForm] = useState(emptyStopForm);
+  const [stopSaving, setStopSaving] = useState(false);
+  const [stopFormError, setStopFormError] = useState<string>();
+
+  function openCreateStop() {
+    setStopForm({ ...emptyStopForm, routeId: routes?.[0]?.id ?? '' });
+    setStopFormError(undefined);
+    setStopModalOpen(true);
+  }
+
+  async function handleSaveStop() {
+    if (!stopForm.routeId || !stopForm.name.trim()) {
+      setStopFormError('Route and stop name are required');
+      return;
+    }
+    setStopSaving(true);
+    setStopFormError(undefined);
+    try {
+      await adminService.transport.stops.create({
+        routeId: stopForm.routeId,
+        name: stopForm.name,
+        time: stopForm.time,
+        order: Number(stopForm.order) || 0,
+      });
+      setSuccessMsg(`Added stop "${stopForm.name}"`);
+      setStopModalOpen(false);
+      reloadStops();
+    } catch (err) {
+      setStopFormError(err instanceof Error ? err.message : 'Could not save stop');
+    } finally {
+      setStopSaving(false);
+    }
+  }
+
+  // Live status modal
+  const [liveStatusModalOpen, setLiveStatusModalOpen] = useState(false);
+  const [liveStatusForm, setLiveStatusForm] = useState(emptyLiveStatusForm);
+  const [liveStatusSaving, setLiveStatusSaving] = useState(false);
+  const [liveStatusFormError, setLiveStatusFormError] = useState<string>();
+
+  function openUpdateLiveStatus(existing?: BusLiveStatus) {
+    if (existing) {
+      setLiveStatusForm({
+        routeId: existing.routeId,
+        currentStop: existing.currentStop,
+        nextStop: existing.nextStop,
+        etaMins: String(existing.etaMins),
+        occupancy: String(existing.occupancy),
+      });
+    } else {
+      setLiveStatusForm({ ...emptyLiveStatusForm, routeId: routes?.[0]?.id ?? '' });
+    }
+    setLiveStatusFormError(undefined);
+    setLiveStatusModalOpen(true);
+  }
+
+  async function handleSaveLiveStatus() {
+    if (!liveStatusForm.routeId || !liveStatusForm.currentStop.trim() || !liveStatusForm.nextStop.trim()) {
+      setLiveStatusFormError('Route, current stop, and next stop are required');
+      return;
+    }
+    setLiveStatusSaving(true);
+    setLiveStatusFormError(undefined);
+    try {
+      await adminService.transport.liveStatus.update({
+        routeId: liveStatusForm.routeId,
+        currentStop: liveStatusForm.currentStop,
+        nextStop: liveStatusForm.nextStop,
+        etaMins: Number(liveStatusForm.etaMins) || 0,
+        occupancy: Number(liveStatusForm.occupancy) || 0,
+      });
+      setSuccessMsg(`Updated live status for ${routeName(liveStatusForm.routeId)}`);
+      setLiveStatusModalOpen(false);
+      reloadLiveStatus();
+    } catch (err) {
+      setLiveStatusFormError(err instanceof Error ? err.message : 'Could not update live status');
+    } finally {
+      setLiveStatusSaving(false);
+    }
+  }
+
+  const routeColumns: Column<BusRoute>[] = [
     {
       key: 'name',
       header: 'Route',
@@ -91,14 +187,43 @@ export function TransportPage() {
     },
     { key: 'driver', header: 'Driver', render: (r) => r.driver },
     { key: 'driverPhone', header: 'Driver phone', render: (r) => r.driverPhone },
-    { key: 'stops', header: 'Stops', render: (r) => `${r.stops.length} stops` },
     {
       key: 'actions',
       header: '',
-      width: '80px',
+      width: '60px',
       render: (r) => (
         <div className="flex justify-end">
-          <Button variant="ghost" size="sm" icon="edit" onClick={() => openEdit(r)} />
+          <Button variant="ghost" size="sm" icon="edit" onClick={() => openEditRoute(r)} />
+        </div>
+      ),
+    },
+  ];
+
+  const sortedStops = [...(stops ?? [])].sort((a, b) => {
+    const rn = routeName(a.routeId).localeCompare(routeName(b.routeId));
+    return rn !== 0 ? rn : a.order - b.order;
+  });
+
+  const stopColumns: Column<BusStop>[] = [
+    { key: 'route', header: 'Route', render: (s) => routeName(s.routeId) },
+    { key: 'name', header: 'Stop', render: (s) => <span className="font-semibold text-ink">{s.name}</span> },
+    { key: 'time', header: 'Time', render: (s) => s.time },
+    { key: 'order', header: 'Order', render: (s) => s.order },
+  ];
+
+  const liveStatusColumns: Column<BusLiveStatus>[] = [
+    { key: 'route', header: 'Route', render: (s) => <span className="font-semibold text-ink">{routeName(s.routeId)}</span> },
+    { key: 'currentStop', header: 'Current stop', render: (s) => s.currentStop },
+    { key: 'nextStop', header: 'Next stop', render: (s) => s.nextStop },
+    { key: 'etaMins', header: 'ETA', render: (s) => `${s.etaMins} min` },
+    { key: 'occupancy', header: 'Occupancy', render: (s) => `${s.occupancy}%` },
+    {
+      key: 'actions',
+      header: '',
+      width: '60px',
+      render: (s) => (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" icon="edit" onClick={() => openUpdateLiveStatus(s)} />
         </div>
       ),
     },
@@ -108,8 +233,14 @@ export function TransportPage() {
     <div>
       <PageHeader
         title="Transport"
-        subtitle={rows ? `${rows.length} routes` : undefined}
-        action={<Button label="Add route" icon="plus" onClick={openCreate} />}
+        subtitle="Bus routes, stops, and live status"
+        action={
+          <div className="flex gap-2">
+            <Chip label="Routes" selected={tab === 'routes'} onClick={() => setTab('routes')} />
+            <Chip label="Stops" selected={tab === 'stops'} onClick={() => setTab('stops')} />
+            <Chip label="Live Status" selected={tab === 'liveStatus'} onClick={() => setTab('liveStatus')} />
+          </div>
+        }
       />
 
       {successMsg && (
@@ -118,26 +249,125 @@ export function TransportPage() {
         </div>
       )}
 
-      {loading ? (
-        <Loading />
-      ) : !rows || rows.length === 0 ? (
-        <EmptyState icon="campus" title="No routes found" actionLabel="Add route" onAction={openCreate} />
-      ) : (
-        <Table columns={columns} rows={rows} />
+      {tab === 'routes' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-small text-ink-muted">{routes ? `${routes.length} routes` : ''}</span>
+            <Button label="Add route" icon="plus" size="sm" onClick={openCreateRoute} />
+          </div>
+          {routesLoading ? (
+            <Loading />
+          ) : !routes || routes.length === 0 ? (
+            <EmptyState icon="transport" title="No routes found" actionLabel="Add route" onAction={openCreateRoute} />
+          ) : (
+            <Table columns={routeColumns} rows={routes} />
+          )}
+        </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit route' : 'Add route'}>
+      {tab === 'stops' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-small text-ink-muted">{stops ? `${stops.length} stops` : ''}</span>
+            <Button label="Add stop" icon="plus" size="sm" onClick={openCreateStop} disabled={!routes || routes.length === 0} />
+          </div>
+          {stopsLoading ? (
+            <Loading />
+          ) : sortedStops.length === 0 ? (
+            <EmptyState icon="transport" title="No stops found" actionLabel="Add stop" onAction={openCreateStop} />
+          ) : (
+            <Table columns={stopColumns} rows={sortedStops} />
+          )}
+        </div>
+      )}
+
+      {tab === 'liveStatus' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-small text-ink-muted">{liveStatuses ? `${liveStatuses.length} routes reporting` : ''}</span>
+            <Button
+              label="Update status"
+              icon="plus"
+              size="sm"
+              onClick={() => openUpdateLiveStatus()}
+              disabled={!routes || routes.length === 0}
+            />
+          </div>
+          {liveStatusLoading ? (
+            <Loading />
+          ) : !liveStatuses || liveStatuses.length === 0 ? (
+            <EmptyState icon="transport" title="No live status reported yet" actionLabel="Update status" onAction={() => openUpdateLiveStatus()} />
+          ) : (
+            <Table columns={liveStatusColumns} rows={liveStatuses} />
+          )}
+        </div>
+      )}
+
+      <Modal open={routeModalOpen} onClose={() => setRouteModalOpen(false)} title={editingRoute ? 'Edit route' : 'Add route'}>
         <div className="flex flex-col gap-4">
-          {formError && <Banner tone="danger" title={formError} />}
+          {routeFormError && <Banner tone="danger" title={routeFormError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Route name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
-            <TextField label="Route number" value={form.number} onChangeText={(v) => setForm((f) => ({ ...f, number: v }))} />
-            <TextField label="Driver" value={form.driver} onChangeText={(v) => setForm((f) => ({ ...f, driver: v }))} />
-            <TextField label="Driver phone" value={form.driverPhone} onChangeText={(v) => setForm((f) => ({ ...f, driverPhone: v }))} />
+            <TextField label="Route name" value={routeForm.name} onChangeText={(v) => setRouteForm((f) => ({ ...f, name: v }))} />
+            <TextField label="Route number" value={routeForm.number} onChangeText={(v) => setRouteForm((f) => ({ ...f, number: v }))} />
+            <TextField label="Driver" value={routeForm.driver} onChangeText={(v) => setRouteForm((f) => ({ ...f, driver: v }))} />
+            <TextField label="Driver phone" value={routeForm.driverPhone} onChangeText={(v) => setRouteForm((f) => ({ ...f, driverPhone: v }))} />
           </div>
           <div className="flex justify-end gap-2">
-            <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
-            <Button label={editing ? 'Save changes' : 'Add route'} size="sm" loading={saving} onClick={handleSave} />
+            <Button label="Cancel" variant="outline" size="sm" onClick={() => setRouteModalOpen(false)} />
+            <Button label={editingRoute ? 'Save changes' : 'Add route'} size="sm" loading={routeSaving} onClick={handleSaveRoute} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={stopModalOpen} onClose={() => setStopModalOpen(false)} title="Add stop">
+        <div className="flex flex-col gap-4">
+          {stopFormError && <Banner tone="danger" title={stopFormError} />}
+          <Select
+            label="Route"
+            value={stopForm.routeId}
+            onChange={(v) => setStopForm((f) => ({ ...f, routeId: v }))}
+            options={(routes ?? []).map((r) => ({ label: r.name, value: r.id }))}
+          />
+          <TextField label="Stop name" value={stopForm.name} onChangeText={(v) => setStopForm((f) => ({ ...f, name: v }))} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="Time" value={stopForm.time} onChangeText={(v) => setStopForm((f) => ({ ...f, time: v }))} placeholder="07:30" />
+            <TextField label="Order" type="number" value={stopForm.order} onChangeText={(v) => setStopForm((f) => ({ ...f, order: v }))} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button label="Cancel" variant="outline" size="sm" onClick={() => setStopModalOpen(false)} />
+            <Button label="Add stop" size="sm" loading={stopSaving} onClick={handleSaveStop} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={liveStatusModalOpen} onClose={() => setLiveStatusModalOpen(false)} title="Update live status">
+        <div className="flex flex-col gap-4">
+          {liveStatusFormError && <Banner tone="danger" title={liveStatusFormError} />}
+          <Select
+            label="Route"
+            value={liveStatusForm.routeId}
+            onChange={(v) => setLiveStatusForm((f) => ({ ...f, routeId: v }))}
+            options={(routes ?? []).map((r) => ({ label: r.name, value: r.id }))}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="Current stop" value={liveStatusForm.currentStop} onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, currentStop: v }))} />
+            <TextField label="Next stop" value={liveStatusForm.nextStop} onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, nextStop: v }))} />
+            <TextField
+              label="ETA (mins)"
+              type="number"
+              value={liveStatusForm.etaMins}
+              onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, etaMins: v }))}
+            />
+            <TextField
+              label="Occupancy (%)"
+              type="number"
+              value={liveStatusForm.occupancy}
+              onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, occupancy: v }))}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button label="Cancel" variant="outline" size="sm" onClick={() => setLiveStatusModalOpen(false)} />
+            <Button label="Update status" size="sm" loading={liveStatusSaving} onClick={handleSaveLiveStatus} />
           </div>
         </div>
       </Modal>
