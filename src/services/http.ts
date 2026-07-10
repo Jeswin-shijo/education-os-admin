@@ -29,6 +29,19 @@ function extractError(data: unknown): { message: string; fieldErrors?: Record<st
   return { message: 'Something went wrong. Please try again.' };
 }
 
+// The Django backend registers every router with `trailing_slash=False` and all
+// its explicit APIView paths are slash-less too, so a trailing slash 404s. Several
+// call sites (and the API doc) still spell endpoints as `/departments/`, `/x/<id>/`,
+// `/subjects/?semester=…`. Normalize here in one place: drop a trailing slash,
+// including one sitting just before the query string.
+function normalizePath(path: string): string {
+  const qIndex = path.indexOf('?');
+  const p = qIndex === -1 ? path : path.slice(0, qIndex);
+  const query = qIndex === -1 ? '' : path.slice(qIndex);
+  const stripped = p.length > 1 ? p.replace(/\/+$/, '') : p;
+  return stripped + query;
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
@@ -76,7 +89,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
 
   let res: Response;
   try {
-    res = await fetch(`${config.API_BASE_URL}${path}`, {
+    res = await fetch(`${config.API_BASE_URL}${normalizePath(path)}`, {
       method,
       headers,
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),

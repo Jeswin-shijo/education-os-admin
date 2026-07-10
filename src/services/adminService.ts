@@ -19,6 +19,7 @@ import type {
   FacultyCandidate,
   FacultyMember,
   FeeInvoice,
+  Gender,
   HodCandidate,
   HostelAllocation,
   HostelBlock,
@@ -133,6 +134,59 @@ export async function getDashboard(): Promise<AdminDashboard> {
 // Students — POST /api/v1/auth/register (role:'student'), multipart when a photo is set
 // =====================================================================================
 const GENDER_API: Record<string, string> = { Male: 'male', Female: 'female', Other: 'other' };
+const GENDER_FROM_API: Record<string, Gender> = { male: 'Male', female: 'Female', other: 'Other' };
+const STU_PALETTE = ['#13327F', '#7C3AED', '#0D9488', '#EA8A00', '#DB2777', '#0EA5E9'];
+function colorForSeed(seed: string): string {
+  let hash = 0;
+  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return STU_PALETTE[hash % STU_PALETTE.length];
+}
+
+// The `/students` list returns Django-shaped rows (snake_case, cgpa as a decimal
+// *string*, semester_number instead of a year). Map them onto the console's Student.
+type StudentApi = {
+  id: string;
+  full_name?: string;
+  roll_no?: string;
+  admission_no?: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  program?: string;
+  semester?: string;
+  section?: string;
+  semester_number?: number;
+  cgpa?: string | number;
+  gender?: string;
+  dob?: string | null;
+  blood_group?: string;
+  mentor_name?: string;
+  avatar_color?: string;
+  profile_pic?: string | null;
+};
+function mapStudentFromApi(s: StudentApi): Student {
+  const semNum = Number(s.semester_number ?? 0);
+  return {
+    id: s.id,
+    name: s.full_name ?? '',
+    rollNo: s.roll_no ?? '',
+    admissionNo: s.admission_no ?? '',
+    email: s.email ?? '',
+    phone: s.phone ?? '',
+    departmentId: s.department ?? '',
+    programId: s.program ?? '',
+    semesterId: s.semester ?? '',
+    sectionId: s.section ?? '',
+    year: semNum ? Math.ceil(semNum / 2) : 0,
+    cgpa: Number(s.cgpa ?? 0) || 0,
+    avatarColor: s.avatar_color ?? colorForSeed(s.id),
+    avatarUrl: s.profile_pic ?? undefined,
+    mentorName: s.mentor_name ?? '',
+    bloodGroup: s.blood_group ?? '',
+    gender: GENDER_FROM_API[(s.gender ?? '').toLowerCase()] ?? 'Male',
+    dob: s.dob ?? '',
+  };
+}
 
 function studentToApiFields(input: Omit<Student, 'id'>): Record<string, string> {
   return {
@@ -166,8 +220,9 @@ export const students = {
         return q ? rows.filter((s) => matches([s.name, s.rollNo, s.email], q)) : rows;
       },
       async () => {
-        const rows = await http.get<Student[]>('/api/v1/students/');
-        return q ? rows.filter((s) => matches([s.name, s.rollNo, s.email], q)) : rows;
+        const rows = await http.get<StudentApi[]>('/api/v1/students/');
+        const mapped = rows.map(mapStudentFromApi);
+        return q ? mapped.filter((s) => matches([s.name, s.rollNo, s.email], q)) : mapped;
       },
     );
   },
@@ -964,6 +1019,17 @@ export const timetable = {
 // =====================================================================================
 // Attendance — read-only overview (existing) + mark-attendance flow (new, item 4)
 // =====================================================================================
+
+/** A markable period for today: a class + one of its scheduled slots. */
+export type MarkSession = {
+  classId: string;
+  subjectLabel: string;
+  sectionLabel: string;
+  start: string;
+  end: string;
+  room: string;
+};
+
 export const attendance = {
   async overview(): Promise<AttendanceOverview> {
     return fromSource(
@@ -979,17 +1045,77 @@ export const attendance = {
         return { overallPercent, sessionsRecorded: sessionRows.length, byClass: bySubject };
       },
       async () => {
-        const summary = await http.get<{ overall_percent?: number; by_subject?: { subject: string; percent: number; sessions: number }[] }>(
-          '/api/v1/attendance/summary',
-        ).catch(() => ({ overall_percent: 0, by_subject: [] }));
-        const overall = await http
-          .get<{ overall_percent?: number }>('/api/v1/attendance/overall')
-          .catch((): { overall_percent?: number } => ({}));
+        // `/attendance/summary` & `/overall` are student-self-scoped (404 for an admin
+        // with no student profile). Build the admin overview by aggregating the raw
+        // records from the admin management list instead.
+        const records = await http
+          .get<{ subject_code?: string; subject_name?: string; status?: string; date?: string }[]>('/api/v1/attendance/manage')
+          .catch(() => [] as { subject_code?: string; subject_name?: string; status?: string; date?: string }[]);
+        const groups = new Map<string, { label: string; attended: number; total: number; dates: Set<string> }>();
+        for (const r of records) {
+          const key = r.subject_code ?? r.subject_name ?? 'Unknown';
+          const label = [r.subject_code, r.subject_name].filter(Boolean).join(' ') || 'Unknown';
+          const g = groups.get(key) ?? { label, attended: 0, total: 0, dates: new Set<string>() };
+          g.total += 1;
+          if (r.status === 'present' || r.status === 'late') g.attended += 1;
+          if (r.date) g.dates.add(r.date);
+          groups.set(key, g);
+        }
+        const all = [...groups.values()];
+        const totAttended = all.reduce((a, g) => a + g.attended, 0);
+        const totAll = all.reduce((a, g) => a + g.total, 0);
         return {
-          overallPercent: overall.overall_percent ?? summary.overall_percent ?? 0,
-          sessionsRecorded: summary.by_subject?.reduce((a, b) => a + b.sessions, 0) ?? 0,
-          byClass: (summary.by_subject ?? []).map((s) => ({ label: s.subject, percent: s.percent, sessions: s.sessions })),
+          overallPercent: totAll ? Math.round((totAttended / totAll) * 100) : 0,
+          sessionsRecorded: records.length,
+          byClass: all.map((g) => ({ label: g.label, percent: g.total ? Math.round((g.attended / g.total) * 100) : 0, sessions: g.dates.size })),
         };
+      },
+    );
+  },
+  // Markable periods for today. Real mode reads faculty classes (the unit attendance
+  // is recorded against) and flattens their slots to today's weekday; if nothing is
+  // scheduled today, it falls back to one row per class so the tool is always usable.
+  // Mock mode derives the same shape from the timetable sessions. `classId` is the id
+  // roster()/saveRecord() must be called with (a FacultyClass id in real mode).
+  async todaySessions(): Promise<MarkSession[]> {
+    const today = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+    return fromSource(
+      async () => {
+        const [sessionRows, subjectRows, sectionRows] = await Promise.all([db.read('sessions'), db.read('subjects'), db.read('sections')]);
+        const subjectLabel = (id: string) => {
+          const s = subjectRows.find((x) => x.id === id);
+          return s ? `${s.code} · ${s.name}` : id;
+        };
+        const sectionLabel = (id: string) => {
+          const s = sectionRows.find((x) => x.id === id);
+          return s ? `Section ${s.name}` : id;
+        };
+        let todays = sessionRows.filter((s) => s.day === today);
+        if (todays.length === 0) todays = sessionRows;
+        return todays
+          .map((s) => ({ classId: s.id, subjectLabel: subjectLabel(s.subjectId), sectionLabel: sectionLabel(s.sectionId), start: s.start, end: s.end, room: s.room }))
+          .sort((a, b) => a.start.localeCompare(b.start));
+      },
+      async () => {
+        const classes = await http.get<
+          { id: string; subjectCode: string; subjectName: string; section: string; slots?: { day: string; start: string; end: string; room: string }[] }[]
+        >('/api/v1/faculty/classes');
+        const todays: MarkSession[] = [];
+        for (const c of classes) {
+          const label = `${c.subjectCode} · ${c.subjectName}`;
+          const section = `Section ${c.section}`;
+          for (const slot of c.slots ?? []) {
+            if (slot.day === today) todays.push({ classId: c.id, subjectLabel: label, sectionLabel: section, start: slot.start, end: slot.end, room: slot.room });
+          }
+        }
+        if (todays.length === 0) {
+          // Nothing scheduled today — offer every class (using its first slot's time if any).
+          for (const c of classes) {
+            const slot = c.slots?.[0];
+            todays.push({ classId: c.id, subjectLabel: `${c.subjectCode} · ${c.subjectName}`, sectionLabel: `Section ${c.section}`, start: slot?.start ?? '', end: slot?.end ?? '', room: slot?.room ?? '' });
+          }
+        }
+        return todays.sort((a, b) => a.start.localeCompare(b.start));
       },
     );
   },
@@ -1003,33 +1129,18 @@ export const attendance = {
         return studentRows.filter((s) => s.sectionId === session.sectionId);
       },
       async () => {
-        try {
-          const rows = await http.get<Record<string, unknown>[]>(`/api/v1/faculty/classes/${classId}/roster/`);
-          return rows.map(
-            (r) =>
-              ({
-                id: r.id as string,
-                name: (r.name as string) ?? (r.full_name as string),
-                rollNo: (r.roll_no as string) ?? '',
-              }) as Student,
-          );
-        } catch {
-          // No faculty-class concept in this console's timetable model — fall back to
-          // fetching the session to find its section, then listing students in that section.
-          const week = await http.get<Record<string, unknown>>('/api/v1/timetable/week').catch(() => ({}));
-          const sessionRows: Record<string, unknown>[] = Array.isArray(week) ? week : Object.values(week).flat();
-          const session = sessionRows.find((s) => s.id === classId);
-          if (!session) return [];
-          const studentRows = await http.get<Record<string, unknown>[]>(`/api/v1/students/?section=${session.section}`).catch(() => []);
-          return studentRows.map(
-            (r) =>
-              ({
-                id: r.id as string,
-                name: r.name as string,
-                rollNo: r.roll_no as string,
-              }) as Student,
-          );
-        }
+        // classId is a FacultyClass id (see todaySessions). The roster endpoint is
+        // readable by admins for any class; it returns {id,name,rollNo,avatarColor}.
+        const rows = await http.get<Record<string, unknown>[]>(`/api/v1/faculty/classes/${classId}/roster`);
+        return rows.map(
+          (r) =>
+            ({
+              id: r.id as string,
+              name: (r.name as string) ?? (r.full_name as string),
+              rollNo: (r.rollNo as string) ?? (r.roll_no as string) ?? '',
+              avatarColor: (r.avatarColor as string) ?? (r.avatar_color as string) ?? undefined,
+            }) as Student,
+        );
       },
     );
   },
@@ -1283,8 +1394,9 @@ export const library = {
             studentName: (l.student_name as string) ?? '',
             issuedOn: l.issued_on as string,
             dueOn: l.due_on as string,
-            returnedOn: l.returned_on as string | undefined,
-            status: l.status as BookLoan['status'],
+            returnedOn: (l.returned_on as string | null) ?? undefined,
+            // Backend uses 'borrowed'; the console's vocabulary is 'active'.
+            status: (l.status === 'borrowed' ? 'active' : l.status) as BookLoan['status'],
           }));
         },
       );
@@ -1303,7 +1415,7 @@ export const library = {
             student: input.studentId,
             issued_on: input.issuedOn,
             due_on: input.dueOn,
-            status: 'active',
+            status: 'borrowed', // backend's STATUS_CHOICES value (app shows it as 'active')
           });
           const row: BookLoan = { id: data.id as string, bookId: input.bookId, bookTitle: input.bookTitle, studentId: input.studentId, studentName: input.studentName, issuedOn: input.issuedOn, dueOn: input.dueOn, status: 'active' };
           await logAction('create', 'Library Loan', `Issued "${input.bookTitle}" to ${input.studentName}`);

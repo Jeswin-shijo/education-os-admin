@@ -3,7 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { formatPercent } from '../../lib';
 import { toLocalISODate } from '../../lib/date';
-import type { AttendanceStatus, ClassSession, Student } from '../../data/types';
+import type { AttendanceStatus, Student } from '../../data/types';
 import { PageHeader, Card, StatCard, Loading, EmptyState, Chip, Button, Banner, Avatar } from '../../components';
 
 const barToneClasses: Record<'good' | 'warn' | 'bad', string> = {
@@ -58,11 +58,9 @@ function OverviewTab() {
 }
 
 function MarkAttendanceTab() {
-  const { data: periods, loading: periodsLoading } = useAsync(() => adminService.timetable.today(), []);
-  const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
-  const { data: sections } = useAsync(() => adminService.sections.list(), []);
+  const { data: periods, loading: periodsLoading } = useAsync(() => adminService.attendance.todaySessions(), []);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [roster, setRoster] = useState<Student[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [entries, setEntries] = useState<Record<string, AttendanceStatus>>({});
@@ -70,20 +68,23 @@ function MarkAttendanceTab() {
   const [error, setError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  const selected = periods?.find((p) => p.id === selectedId) ?? null;
-  const subjectFor = (s: ClassSession) => subjects?.find((x) => x.id === s.subjectId);
-  const sectionFor = (s: ClassSession) => sections?.find((x) => x.id === s.sectionId);
-  const periodNumber = selected && periods ? periods.findIndex((p) => p.id === selected.id) + 1 : 1;
+  const selected = selectedIdx != null && periods ? periods[selectedIdx] : null;
+  const periodNumber = selectedIdx != null ? selectedIdx + 1 : 1;
 
-  async function selectPeriod(session: ClassSession) {
-    setSelectedId(session.id);
+  async function selectPeriod(idx: number) {
+    const p = periods?.[idx];
+    if (!p) return;
+    setSelectedIdx(idx);
     setSuccessMsg(undefined);
     setError(undefined);
     setRosterLoading(true);
     try {
-      const students = await adminService.attendance.roster(session.id);
+      const students = await adminService.attendance.roster(p.classId);
       setRoster(students);
       setEntries(Object.fromEntries(students.map((s) => [s.id, 'present' as AttendanceStatus])));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load the roster');
+      setRoster([]);
     } finally {
       setRosterLoading(false);
     }
@@ -102,7 +103,7 @@ function MarkAttendanceTab() {
     setError(undefined);
     try {
       await adminService.attendance.saveRecord({
-        classId: selected.id,
+        classId: selected.classId,
         date: toLocalISODate(new Date()),
         period: periodNumber,
         entries: roster.map((s) => ({ studentId: s.id, status: entries[s.id] ?? 'present' })),
@@ -117,7 +118,7 @@ function MarkAttendanceTab() {
 
   if (periodsLoading) return <Loading />;
   if (!periods || periods.length === 0) {
-    return <EmptyState icon="attendance" title="No periods scheduled today" message="This weekday has no timetable sessions." />;
+    return <EmptyState icon="attendance" title="No classes to mark" message="No classes are available to record attendance against." />;
   }
 
   return (
@@ -125,17 +126,14 @@ function MarkAttendanceTab() {
       <Card>
         <div className="mb-2 text-title text-ink">1. Select today's period</div>
         <div className="flex flex-wrap gap-2">
-          {periods.map((p, i) => {
-            const subject = subjectFor(p);
-            return (
-              <Chip
-                key={p.id}
-                label={`${i + 1}. ${subject ? subject.code : p.subjectId} · ${p.start}`}
-                selected={p.id === selectedId}
-                onClick={() => selectPeriod(p)}
-              />
-            );
-          })}
+          {periods.map((p, i) => (
+            <Chip
+              key={`${p.classId}-${p.start}-${i}`}
+              label={`${i + 1}. ${p.subjectLabel.split(' · ')[0]}${p.start ? ` · ${p.start}` : ''}`}
+              selected={i === selectedIdx}
+              onClick={() => selectPeriod(i)}
+            />
+          ))}
         </div>
       </Card>
 
@@ -144,10 +142,12 @@ function MarkAttendanceTab() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-title text-ink">
-                {subjectFor(selected)?.name ?? selected.subjectId} — {sectionFor(selected) ? `Section ${sectionFor(selected)!.name}` : ''}
+                {selected.subjectLabel} — {selected.sectionLabel}
               </div>
               <div className="text-caption text-ink-soft">
-                {toLocalISODate(new Date())} · Period {periodNumber} · {selected.start}–{selected.end} · Room {selected.room}
+                {toLocalISODate(new Date())} · Period {periodNumber}
+                {selected.start ? ` · ${selected.start}–${selected.end}` : ''}
+                {selected.room ? ` · Room ${selected.room}` : ''}
               </div>
             </div>
             <Button label="Mark all present" variant="outline" size="sm" onClick={markAllPresent} />

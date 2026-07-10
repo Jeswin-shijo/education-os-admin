@@ -41,7 +41,9 @@ export async function list(): Promise<Certificate[]> {
   return fromSource(
     () => db.read('certificates'),
     async () => {
-      const rows = await http.get<CertificateApi[]>('/api/v1/certificates');
+      // `/certificates` is the student's own list (404 for admin). Admins list via the
+      // admin CRUD resource.
+      const rows = await http.get<CertificateApi[]>('/api/v1/certificates-admin');
       return rows.map(mapCertificate);
     },
   );

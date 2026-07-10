@@ -18,23 +18,27 @@ type ComplaintApi = {
   id: string;
   student?: string;
   student_name?: string;
+  studentName?: string;
   category: string;
   subject: string;
   description: string;
   status: Complaint['status'];
-  created_on: string;
+  created_on?: string;
+  createdOn?: string;
 };
+// `/complaints/monitor` returns { total, byStatus, complaints: [...] } (camelCase rows).
+type MonitorResponse = { complaints?: ComplaintApi[] } | ComplaintApi[];
 
 function mapComplaint(c: ComplaintApi): Complaint {
   return {
     id: c.id,
     studentId: c.student,
-    studentName: c.student_name,
+    studentName: c.studentName ?? c.student_name,
     category: c.category,
     subject: c.subject,
     description: c.description,
     status: c.status,
-    createdOn: c.created_on,
+    createdOn: c.createdOn ?? c.created_on ?? '',
   };
 }
 
@@ -42,7 +46,8 @@ export async function list(): Promise<Complaint[]> {
   return fromSource(
     () => db.read('complaints'),
     async () => {
-      const rows = await http.get<ComplaintApi[]>('/api/v1/complaints/monitor');
+      const res = await http.get<MonitorResponse>('/api/v1/complaints/monitor');
+      const rows = Array.isArray(res) ? res : res.complaints ?? [];
       return rows.map(mapComplaint);
     },
   );
