@@ -6,7 +6,7 @@ import { Button, TextField, Banner, Logo } from '../components';
 export function LoginPage() {
   const { status, login } = useAuth();
   const [email, setEmail] = useState('admin@campus.edu.in');
-  const [password, setPassword] = useState('campus123');
+  const [password, setPassword] = useState('admin');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +41,7 @@ export function LoginPage() {
           <TextField label="Password" type="password" value={password} onChangeText={setPassword} placeholder="••••••••" />
           <Button label="Log in" type="submit" full loading={loading} />
           <p className="text-center text-caption text-ink-soft">
-            Demo login prefilled — admin@campus.edu.in / campus123
+            Demo login prefilled — admin@campus.edu.in / admin
           </p>
         </form>
       </div>
