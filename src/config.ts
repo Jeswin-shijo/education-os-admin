@@ -6,6 +6,6 @@
 // the Django backend, set `VITE_USE_MOCK_DATA=false` (and optionally `VITE_API_BASE_URL`)
 // in a `.env.local` — no code changes needed; every page already has a real HTTP arm.
 export const config = {
-  API_BASE_URL: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000',
+  API_BASE_URL: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://education-os-backend.onrender.com',
   USE_MOCK_DATA: (import.meta.env.VITE_USE_MOCK_DATA as string | undefined) !== 'false',
 };

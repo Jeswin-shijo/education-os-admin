@@ -1208,7 +1208,9 @@ export const fees = {
           title: input.title,
           term: input.term,
           amount: input.amount,
-          due_date: input.dueDate,
+          // Backend write field is camelCase `dueDate`; `due_date` is silently
+          // ignored (persists null). Verified live against the API.
+          dueDate: input.dueDate,
         });
         const row: FeeInvoice = {
           id: data.id as string,
