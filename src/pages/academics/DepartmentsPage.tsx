@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Department } from '../../data/types';
 import {
   PageHeader,
@@ -46,6 +47,7 @@ export function DepartmentsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -60,6 +62,7 @@ export function DepartmentsPage() {
     setEditing(null);
     setForm(emptyForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -71,24 +74,32 @@ export function DepartmentsPage() {
       hod: d.hod ?? NO_HOD,
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
   function handleCodeChange(code: string) {
     const preset = DEPARTMENT_PRESETS.find((p) => p.code === code);
     setForm((f) => ({ ...f, code, name: preset?.name ?? f.name }));
+    setErrors((e) => ({ ...e, code: undefined, name: undefined }));
   }
 
   function handleNameChange(name: string) {
     const preset = DEPARTMENT_PRESETS.find((p) => p.name === name);
     setForm((f) => ({ ...f, name, code: preset?.code ?? f.code }));
+    setErrors((e) => ({ ...e, code: undefined, name: undefined }));
+  }
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.code.trim()) e.code = 'Code is required';
+    if (!form.name.trim()) e.name = 'Name is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   async function handleSave() {
-    if (!form.code.trim() || !form.name.trim()) {
-      setFormError('Code and name are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -173,12 +184,16 @@ export function DepartmentsPage() {
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="Code"
+              required
+              error={errors.code}
               value={form.code}
               onChange={handleCodeChange}
               options={DEPARTMENT_PRESETS.map((p) => ({ label: p.code, value: p.code }))}
             />
             <Select
               label="Name"
+              required
+              error={errors.name}
               value={form.name}
               onChange={handleNameChange}
               options={DEPARTMENT_PRESETS.map((p) => ({ label: p.name, value: p.name }))}

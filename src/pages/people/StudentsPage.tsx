@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Section, Semester, Student } from '../../data/types';
-import { minLen, required, composeValidators } from '../../lib/validation';
+import { isEmail } from '../../lib/validation';
 import { toLocalISODate } from '../../lib/date';
 import {
   PageHeader,
@@ -47,8 +48,6 @@ const emptyForm = {
   avatarUrl: '',
 };
 
-const validatePassword = composeValidators(required('Password is required'), minLen(8, 'Password must be at least 8 characters'));
-
 export function StudentsPage() {
   const [q, setQ] = useState('');
   const { data: rows, loading, reload } = useAsync(() => adminService.students.list(q), [q]);
@@ -63,6 +62,12 @@ export function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [photoError, setPhotoError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -94,6 +99,7 @@ export function StudentsPage() {
     setForm({ ...emptyForm, departmentId: firstDept, programId: firstProgram, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' });
     setFormError(undefined);
     setPhotoError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -122,6 +128,7 @@ export function StudentsPage() {
     });
     setFormError(undefined);
     setPhotoError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -131,6 +138,7 @@ export function StudentsPage() {
     const firstSemester = sems[0]?.id ?? '';
     const secs = await loadSections(firstSemester);
     setForm((f) => ({ ...f, departmentId, programId: firstProgram, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' }));
+    setErrors((e) => ({ ...e, departmentId: undefined, programId: undefined, semesterId: undefined, sectionId: undefined }));
   }
 
   async function handleProgramChange(programId: string) {
@@ -138,11 +146,13 @@ export function StudentsPage() {
     const firstSemester = sems[0]?.id ?? '';
     const secs = await loadSections(firstSemester);
     setForm((f) => ({ ...f, programId, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' }));
+    setErrors((e) => ({ ...e, programId: undefined, semesterId: undefined, sectionId: undefined }));
   }
 
   async function handleSemesterChange(semesterId: string) {
     const secs = await loadSections(semesterId);
     setForm((f) => ({ ...f, semesterId, sectionId: secs[0]?.id ?? '' }));
+    setErrors((e) => ({ ...e, semesterId: undefined, sectionId: undefined }));
   }
 
   function handlePhotoChange(file: File | undefined) {
@@ -157,18 +167,26 @@ export function StudentsPage() {
     reader.readAsDataURL(file);
   }
 
-  async function handleSave() {
-    if (!form.name.trim() || !form.rollNo.trim() || !form.email.trim() || !form.departmentId || !form.programId || !form.semesterId || !form.sectionId) {
-      setFormError('Name, roll number, email, department, program, semester, and section are required');
-      return;
-    }
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = 'Full name is required';
+    if (!form.rollNo.trim()) e.rollNo = 'Roll number is required';
+    if (!form.email.trim()) e.email = 'Email is required';
+    else if (!isEmail(form.email)) e.email = 'Enter a valid email';
     if (!editing) {
-      const passwordError = validatePassword(form.password);
-      if (passwordError) {
-        setFormError(passwordError);
-        return;
-      }
+      if (!form.password) e.password = 'Password is required';
+      else if (form.password.length < 8) e.password = 'Password must be at least 8 characters';
     }
+    if (!form.departmentId) e.departmentId = 'Department is required';
+    if (!form.programId) e.programId = 'Program is required';
+    if (!form.semesterId) e.semesterId = 'Semester is required';
+    if (!form.sectionId) e.sectionId = 'Section is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSave() {
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -297,17 +315,20 @@ export function StudentsPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Full name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
-            <TextField label="Roll number" value={form.rollNo} onChangeText={(v) => setForm((f) => ({ ...f, rollNo: v }))} />
+            <TextField label="Full name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
+            <TextField label="Roll number" required error={errors.rollNo} value={form.rollNo} onChangeText={(v) => setField('rollNo', v)} />
             <TextField label="Admission no." value={form.admissionNo} onChangeText={(v) => setForm((f) => ({ ...f, admissionNo: v }))} />
-            <TextField label="Email" type="email" value={form.email} onChangeText={(v) => setForm((f) => ({ ...f, email: v }))} />
-            <TextField label="Phone" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
+            <TextField label="Email" type="email" autoComplete="off" required error={errors.email} value={form.email} onChangeText={(v) => setField('email', v)} />
+            <TextField label="Phone" autoComplete="off" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
             {!editing && (
               <TextField
                 label="Password"
                 type="password"
+                autoComplete="new-password"
+                required
+                error={errors.password}
                 value={form.password}
-                onChangeText={(v) => setForm((f) => ({ ...f, password: v }))}
+                onChangeText={(v) => setField('password', v)}
                 placeholder="Min. 8 characters"
               />
             )}
@@ -325,26 +346,34 @@ export function StudentsPage() {
             />
             <Select
               label="Department"
+              required
+              error={errors.departmentId}
               value={form.departmentId}
               onChange={handleDepartmentChange}
               options={(departments ?? []).map((d) => ({ label: d.name, value: d.id }))}
             />
             <Select
               label="Program"
+              required
+              error={errors.programId}
               value={form.programId}
               onChange={handleProgramChange}
               options={programsForDept(form.departmentId).map((p) => ({ label: p.name, value: p.id }))}
             />
             <Select
               label="Semester"
+              required
+              error={errors.semesterId}
               value={form.semesterId}
               onChange={handleSemesterChange}
               options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
             <Select
               label="Section"
+              required
+              error={errors.sectionId}
               value={form.sectionId}
-              onChange={(v) => setForm((f) => ({ ...f, sectionId: v }))}
+              onChange={(v) => setField('sectionId', v)}
               options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
             />
             <TextField label="Year" type="number" value={form.year} onChangeText={(v) => setForm((f) => ({ ...f, year: v }))} />

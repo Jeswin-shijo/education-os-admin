@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as examService from '../../services/examService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { ExamResult } from '../../data/types';
 import {
   PageHeader,
@@ -51,6 +52,12 @@ export function ResultsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
@@ -70,6 +77,7 @@ export function ResultsPage() {
     setEditing(null);
     setForm({ ...emptyForm, studentId: students?.[0]?.id ?? '', subjectId: subjects?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -86,14 +94,22 @@ export function ResultsPage() {
       credits: String(result.credits),
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.studentId) e.studentId = 'Student is required';
+    if (!form.subjectId) e.subjectId = 'Subject is required';
+    if (!form.exam.trim()) e.exam = 'Exam is required';
+    if (!form.grade.trim()) e.grade = 'Grade is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.studentId || !form.subjectId || !form.exam.trim() || !form.grade.trim()) {
-      setFormError('Student, subject, exam, and grade are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -178,24 +194,28 @@ export function ResultsPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <SearchableSelect
             label="Student"
+            required
+            error={errors.studentId}
             value={form.studentId}
-            onChange={(v) => setForm((f) => ({ ...f, studentId: v }))}
+            onChange={(v) => setField('studentId', v)}
             options={studentOptions}
             placeholder="Search by name or roll no…"
           />
           <Select
             label="Subject"
+            required
+            error={errors.subjectId}
             value={form.subjectId}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+            onChange={(v) => setField('subjectId', v)}
             options={subjectOptions}
           />
-          <TextField label="Exam" value={form.exam} onChangeText={(v) => setForm((f) => ({ ...f, exam: v }))} placeholder="Mid Semester" />
+          <TextField label="Exam" required error={errors.exam} value={form.exam} onChangeText={(v) => setField('exam', v)} placeholder="Mid Semester" />
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Marks" type="number" value={form.marks} onChangeText={(v) => setForm((f) => ({ ...f, marks: v }))} />
             <TextField label="Max marks" type="number" value={form.maxMarks} onChangeText={(v) => setForm((f) => ({ ...f, maxMarks: v }))} />
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <TextField label="Grade" value={form.grade} onChangeText={(v) => setForm((f) => ({ ...f, grade: v }))} placeholder="A" />
+            <TextField label="Grade" required error={errors.grade} value={form.grade} onChangeText={(v) => setField('grade', v)} placeholder="A" />
             <TextField
               label="Grade point"
               type="number"

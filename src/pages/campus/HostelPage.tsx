@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { HostelAllocation, HostelBlock, HostelRoom } from '../../data/types';
 import { formatINR } from '../../lib';
 import {
@@ -53,18 +54,21 @@ export function HostelPage() {
   const [blockDeleteTarget, setBlockDeleteTarget] = useState<HostelBlock | null>(null);
   const [blockDeleteError, setBlockDeleteError] = useState<string>();
   const [blockDeleting, setBlockDeleting] = useState(false);
+  const blockErrors = useFieldErrors();
 
   function openCreateBlock() {
     setBlockForm(emptyBlockForm);
     setBlockFormError(undefined);
+    blockErrors.resetErrors();
     setBlockModalOpen(true);
   }
 
   async function handleSaveBlock() {
-    if (!blockForm.name.trim() || !blockForm.warden.trim()) {
-      setBlockFormError('Name and warden are required');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (!blockForm.name.trim()) e.name = 'Block name is required';
+    if (!blockForm.warden.trim()) e.warden = 'Warden is required';
+    blockErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     setBlockSaving(true);
     setBlockFormError(undefined);
     try {
@@ -103,18 +107,21 @@ export function HostelPage() {
   const [roomForm, setRoomForm] = useState(emptyRoomForm);
   const [roomSaving, setRoomSaving] = useState(false);
   const [roomFormError, setRoomFormError] = useState<string>();
+  const roomErrors = useFieldErrors();
 
   function openCreateRoom() {
     setRoomForm({ ...emptyRoomForm, blockId: blocks?.[0]?.id ?? '' });
     setRoomFormError(undefined);
+    roomErrors.resetErrors();
     setRoomModalOpen(true);
   }
 
   async function handleSaveRoom() {
-    if (!roomForm.blockId || !roomForm.roomNo.trim()) {
-      setRoomFormError('Block and room number are required');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (!roomForm.blockId) e.blockId = 'Block is required';
+    if (!roomForm.roomNo.trim()) e.roomNo = 'Room number is required';
+    roomErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     setRoomSaving(true);
     setRoomFormError(undefined);
     try {
@@ -141,19 +148,24 @@ export function HostelPage() {
   const [allocationDeleteTarget, setAllocationDeleteTarget] = useState<HostelAllocation | null>(null);
   const [allocationDeleteError, setAllocationDeleteError] = useState<string>();
   const [allocationDeleting, setAllocationDeleting] = useState(false);
+  const allocErrors = useFieldErrors();
 
   function openCreateAllocation() {
     setAllocationForm({ ...emptyAllocationForm, roomId: rooms?.[0]?.id ?? '' });
     setAllocationFormError(undefined);
+    allocErrors.resetErrors();
     setAllocationModalOpen(true);
   }
 
   async function handleSaveAllocation() {
+    const e: Record<string, string> = {};
+    if (!allocationForm.studentId) e.studentId = 'Student is required';
+    if (!allocationForm.roomId) e.roomId = 'Room is required';
+    if (!allocationForm.bed.trim()) e.bed = 'Bed is required';
+    allocErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     const student = students?.find((s) => s.id === allocationForm.studentId);
-    if (!student || !allocationForm.roomId || !allocationForm.bed.trim()) {
-      setAllocationFormError('Student, room, and bed are required');
-      return;
-    }
+    if (!student) return;
     setAllocationSaving(true);
     setAllocationFormError(undefined);
     try {
@@ -301,9 +313,9 @@ export function HostelPage() {
       <Modal open={blockModalOpen} onClose={() => setBlockModalOpen(false)} title="Add block">
         <div className="flex flex-col gap-4">
           {blockFormError && <Banner tone="danger" title={blockFormError} />}
-          <TextField label="Block name" value={blockForm.name} onChangeText={(v) => setBlockForm((f) => ({ ...f, name: v }))} />
+          <TextField label="Block name" required error={blockErrors.errors.name} value={blockForm.name} onChangeText={(v) => { setBlockForm((f) => ({ ...f, name: v })); blockErrors.clearError('name'); }} />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Warden" value={blockForm.warden} onChangeText={(v) => setBlockForm((f) => ({ ...f, warden: v }))} />
+            <TextField label="Warden" required error={blockErrors.errors.warden} value={blockForm.warden} onChangeText={(v) => { setBlockForm((f) => ({ ...f, warden: v })); blockErrors.clearError('warden'); }} />
             <TextField label="Warden phone" value={blockForm.wardenPhone} onChangeText={(v) => setBlockForm((f) => ({ ...f, wardenPhone: v }))} />
           </div>
           <div className="flex justify-end gap-2">
@@ -331,12 +343,14 @@ export function HostelPage() {
           {roomFormError && <Banner tone="danger" title={roomFormError} />}
           <Select
             label="Block"
+            required
+            error={roomErrors.errors.blockId}
             value={roomForm.blockId}
-            onChange={(v) => setRoomForm((f) => ({ ...f, blockId: v }))}
+            onChange={(v) => { setRoomForm((f) => ({ ...f, blockId: v })); roomErrors.clearError('blockId'); }}
             options={(blocks ?? []).map((b) => ({ label: b.name, value: b.id }))}
           />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Room no." value={roomForm.roomNo} onChangeText={(v) => setRoomForm((f) => ({ ...f, roomNo: v }))} />
+            <TextField label="Room no." required error={roomErrors.errors.roomNo} value={roomForm.roomNo} onChangeText={(v) => { setRoomForm((f) => ({ ...f, roomNo: v })); roomErrors.clearError('roomNo'); }} />
             <TextField label="Capacity" type="number" value={roomForm.capacity} onChangeText={(v) => setRoomForm((f) => ({ ...f, capacity: v }))} />
           </div>
           <div className="flex justify-end gap-2">
@@ -351,19 +365,23 @@ export function HostelPage() {
           {allocationFormError && <Banner tone="danger" title={allocationFormError} />}
           <SearchableSelect
             label="Student"
+            required
+            error={allocErrors.errors.studentId}
             value={allocationForm.studentId}
-            onChange={(v) => setAllocationForm((f) => ({ ...f, studentId: v }))}
+            onChange={(v) => { setAllocationForm((f) => ({ ...f, studentId: v })); allocErrors.clearError('studentId'); }}
             options={(students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }))}
             placeholder="Search by name or roll no…"
           />
           <Select
             label="Room"
+            required
+            error={allocErrors.errors.roomId}
             value={allocationForm.roomId}
-            onChange={(v) => setAllocationForm((f) => ({ ...f, roomId: v }))}
+            onChange={(v) => { setAllocationForm((f) => ({ ...f, roomId: v })); allocErrors.clearError('roomId'); }}
             options={(rooms ?? []).map((r) => ({ label: `${blockName(r.blockId)} — ${r.roomNo}`, value: r.id }))}
           />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Bed" value={allocationForm.bed} onChangeText={(v) => setAllocationForm((f) => ({ ...f, bed: v }))} />
+            <TextField label="Bed" required error={allocErrors.errors.bed} value={allocationForm.bed} onChangeText={(v) => { setAllocationForm((f) => ({ ...f, bed: v })); allocErrors.clearError('bed'); }} />
             <TextField label="Mess plan" value={allocationForm.messPlan} onChangeText={(v) => setAllocationForm((f) => ({ ...f, messPlan: v }))} />
           </div>
           <TextField label="Fees" type="number" value={allocationForm.fees} onChangeText={(v) => setAllocationForm((f) => ({ ...f, fees: v }))} />

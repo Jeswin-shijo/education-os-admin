@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Section } from '../../data/types';
 import {
   PageHeader,
@@ -32,6 +33,7 @@ export function SectionsPage() {
   const [form, setForm] = useState({ semesterId: '', name: 'A' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Section | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -41,14 +43,20 @@ export function SectionsPage() {
   function openCreate() {
     setForm({ semesterId: semesters?.[0]?.id ?? '', name: 'A' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.semesterId) e.semesterId = 'Semester is required';
+    if (!form.name.trim()) e.name = 'Section name is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.semesterId || !form.name.trim()) {
-      setFormError('Semester and name are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -120,11 +128,13 @@ export function SectionsPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <Select
             label="Semester"
+            required
+            error={errors.semesterId}
             value={form.semesterId}
-            onChange={(v) => setForm((f) => ({ ...f, semesterId: v }))}
+            onChange={(v) => { setForm((f) => ({ ...f, semesterId: v })); clearError('semesterId'); }}
             options={(semesters ?? []).map((s) => ({ label: semesterLabel(s.id), value: s.id }))}
           />
-          <TextField label="Section name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="A" />
+          <TextField label="Section name" required error={errors.name} value={form.name} onChangeText={(v) => { setForm((f) => ({ ...f, name: v })); clearError('name'); }} placeholder="A" />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label="Add section" size="sm" loading={saving} onClick={handleSave} />

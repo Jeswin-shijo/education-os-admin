@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { NotificationItem, Role } from '../../data/types';
 import { formatRelative } from '../../lib';
 import {
@@ -65,23 +66,28 @@ export function NotificationsPage() {
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const recipientOptions = (recipients ?? []).map((r) => ({ label: `${r.name} (${r.role})`, value: r.id }));
 
   function switchMode(next: Mode) {
     setMode(next);
     setFormError(undefined);
+    resetErrors();
   }
 
   async function handleSend() {
-    if (!form.title.trim() || !form.body.trim()) {
-      setFormError('Title and body are required');
-      return;
-    }
-    if (mode === 'direct' && !form.recipientId) {
-      setFormError('Select a recipient');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (mode === 'direct' && !form.recipientId) e.recipientId = 'Recipient is required';
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.body.trim()) e.body = 'Body is required';
+    setErrors(e);
+    if (Object.keys(e).length) return;
     setSending(true);
     setFormError(undefined);
     try {
@@ -146,8 +152,10 @@ export function NotificationsPage() {
           {mode === 'direct' ? (
             <SearchableSelect
               label="Recipient"
+              required
+              error={errors.recipientId}
               value={form.recipientId}
-              onChange={(v) => setForm((f) => ({ ...f, recipientId: v }))}
+              onChange={(v) => setField('recipientId', v)}
               options={recipientOptions}
               placeholder="Search by name…"
             />
@@ -161,7 +169,7 @@ export function NotificationsPage() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
+            <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} />
             <Select
               label="Category"
               value={form.category}
@@ -169,7 +177,7 @@ export function NotificationsPage() {
               options={categoryOptions}
             />
           </div>
-          <TextField label="Body" value={form.body} onChangeText={(v) => setForm((f) => ({ ...f, body: v }))} />
+          <TextField label="Body" required error={errors.body} value={form.body} onChangeText={(v) => setField('body', v)} />
 
           <div className="flex justify-end">
             <Button

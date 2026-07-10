@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { CORE_SUBJECT_IDS } from '../../data/seed';
 import type { Subject } from '../../data/types';
 import {
@@ -44,6 +45,12 @@ export function SubjectsPage() {
   const [semesterOptions, setSemesterOptions] = useState<{ id: string; number: number }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -71,6 +78,7 @@ export function SubjectsPage() {
     setForm({ ...emptyForm, departmentId: firstDept, programId: firstProgram });
     await loadSemesters(firstProgram);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -89,25 +97,35 @@ export function SubjectsPage() {
     });
     await loadSemesters(owningProgramId);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
   async function handleDepartmentChange(departmentId: string) {
     const firstProgram = programsForDept(departmentId)[0]?.id ?? '';
     setForm((f) => ({ ...f, departmentId, programId: firstProgram, semesterId: '' }));
+    setErrors((e) => ({ ...e, departmentId: undefined, semesterId: undefined }));
     await loadSemesters(firstProgram);
   }
 
   async function handleProgramChange(programId: string) {
     setForm((f) => ({ ...f, programId, semesterId: '' }));
+    setErrors((e) => ({ ...e, semesterId: undefined }));
     await loadSemesters(programId);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.code.trim()) e.code = 'Code is required';
+    if (!form.name.trim()) e.name = 'Name is required';
+    if (!form.departmentId) e.departmentId = 'Department is required';
+    if (!form.semesterId) e.semesterId = 'Semester is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.code.trim() || !form.name.trim() || !form.departmentId || !form.semesterId) {
-      setFormError('Code, name, department, and semester are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -223,8 +241,8 @@ export function SubjectsPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Code" value={form.code} onChangeText={(v) => setForm((f) => ({ ...f, code: v }))} />
-            <TextField label="Name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
+            <TextField label="Code" required error={errors.code} value={form.code} onChangeText={(v) => setField('code', v)} />
+            <TextField label="Name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
             <TextField label="Credits" type="number" value={form.credits} onChangeText={(v) => setForm((f) => ({ ...f, credits: v }))} />
             <Select
               label="Faculty"
@@ -232,7 +250,7 @@ export function SubjectsPage() {
               onChange={(v) => setForm((f) => ({ ...f, facultyId: v }))}
               options={[{ label: 'Unassigned', value: '' }, ...(facultyCandidates ?? []).map((c) => ({ label: c.fullName, value: c.id }))]}
             />
-            <Select label="Department" value={form.departmentId} onChange={handleDepartmentChange} options={departmentOptions} />
+            <Select label="Department" required error={errors.departmentId} value={form.departmentId} onChange={handleDepartmentChange} options={departmentOptions} />
             <Select
               label="Program"
               value={form.programId}
@@ -241,8 +259,10 @@ export function SubjectsPage() {
             />
             <Select
               label="Semester"
+              required
+              error={errors.semesterId}
               value={form.semesterId}
-              onChange={(v) => setForm((f) => ({ ...f, semesterId: v }))}
+              onChange={(v) => setField('semesterId', v)}
               options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
           </div>

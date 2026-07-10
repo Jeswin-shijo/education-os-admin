@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as quizService from '../../services/quizService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Quiz, QuizQuestion } from '../../data/types';
 import {
   PageHeader,
@@ -48,6 +49,12 @@ export function QuizzesPage() {
   const [questions, setQuestions] = useState<DraftQuestion[]>([blankQuestion()]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Quiz | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -65,6 +72,7 @@ export function QuizzesPage() {
     setForm({ ...emptyForm, subjectId: subjects?.[0]?.id ?? '' });
     setQuestions([blankQuestion()]);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -91,10 +99,11 @@ export function QuizzesPage() {
   }
 
   async function handleSave() {
-    if (!form.subjectId || !form.title.trim()) {
-      setFormError('Subject and quiz title are required');
-      return;
-    }
+    const fieldErr: Record<string, string> = {};
+    if (!form.subjectId) fieldErr.subjectId = 'Subject is required';
+    if (!form.title.trim()) fieldErr.title = 'Quiz title is required';
+    setErrors(fieldErr);
+    if (Object.keys(fieldErr).length) return;
     // Drop fully-empty trailing rows, but keep anything partially filled so the user
     // can see (and fix) what's incomplete.
     const cleaned = questions.filter((row) => !isFullyEmpty(row));
@@ -179,11 +188,13 @@ export function QuizzesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="Subject"
+              required
+              error={errors.subjectId}
               value={form.subjectId}
-              onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+              onChange={(v) => setField('subjectId', v)}
               options={subjectOptions}
             />
-            <TextField label="Quiz title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} placeholder="Unit 1 quiz" />
+            <TextField label="Quiz title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="Unit 1 quiz" />
           </div>
 
           <div className="flex flex-col gap-3">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { FeeInvoice, PaymentMethod } from '../../data/types';
 import { formatINR, formatDate } from '../../lib';
 import {
@@ -49,6 +50,7 @@ export function FeesPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [paymentTarget, setPaymentTarget] = useState<FeeInvoice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -62,24 +64,31 @@ export function FeesPage() {
     setStudentId('');
     setLines([newLine()]);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
   function updateLine(key: number, patch: Partial<LineItem>) {
     setLines((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    Object.keys(patch).forEach((field) => clearError(`${key}:${field}`));
+  }
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!studentId) e.studentId = 'Student is required';
+    lines.forEach((l) => {
+      if (!l.title.trim()) e[`${l.key}:title`] = 'Title is required';
+      if (!l.term.trim()) e[`${l.key}:term`] = 'Term is required';
+      if (!l.dueDate) e[`${l.key}:dueDate`] = 'Due date is required';
+    });
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   async function handleSave() {
+    if (!validate()) return;
     const student = students?.find((s) => s.id === studentId);
-    if (!student) {
-      setFormError('Select a student');
-      return;
-    }
-    const incomplete = lines.some((l) => !l.title.trim() || !l.term.trim() || !l.dueDate);
-    if (incomplete) {
-      setFormError('Every invoice line needs a title, term, and due date');
-      return;
-    }
+    if (!student) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -186,7 +195,15 @@ export function FeesPage() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add invoice(s)" width={560}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <SearchableSelect label="Student" value={studentId} onChange={setStudentId} options={studentOptions} placeholder="Search by name or roll no…" />
+          <SearchableSelect
+            label="Student"
+            required
+            error={errors.studentId}
+            value={studentId}
+            onChange={(v) => { setStudentId(v); clearError('studentId'); }}
+            options={studentOptions}
+            placeholder="Search by name or roll no…"
+          />
 
           <div className="flex flex-col gap-3">
             {lines.map((line, i) => (
@@ -205,10 +222,10 @@ export function FeesPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <TextField label="Title" value={line.title} onChangeText={(v) => updateLine(line.key, { title: v })} />
-                  <TextField label="Term" value={line.term} onChangeText={(v) => updateLine(line.key, { term: v })} />
+                  <TextField label="Title" required error={errors[`${line.key}:title`]} value={line.title} onChangeText={(v) => updateLine(line.key, { title: v })} />
+                  <TextField label="Term" required error={errors[`${line.key}:term`]} value={line.term} onChangeText={(v) => updateLine(line.key, { term: v })} />
                   <TextField label="Amount" type="number" value={line.amount} onChangeText={(v) => updateLine(line.key, { amount: v })} />
-                  <DatePicker label="Due date" value={line.dueDate} onChange={(v) => updateLine(line.key, { dueDate: v })} />
+                  <DatePicker label="Due date" required error={errors[`${line.key}:dueDate`]} value={line.dueDate} onChange={(v) => updateLine(line.key, { dueDate: v })} />
                 </div>
               </div>
             ))}

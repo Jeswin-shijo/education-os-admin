@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { toLocalISODate } from '../../lib/date';
 import type { Book, BookLoan } from '../../data/types';
 import {
@@ -38,6 +39,12 @@ function BooksTab() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -48,6 +55,7 @@ function BooksTab() {
     setEditing(null);
     setForm(emptyForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -55,14 +63,20 @@ function BooksTab() {
     setEditing(b);
     setForm({ title: b.title, author: b.author, category: b.category, copies: String(b.copies), available: String(b.available) });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.author.trim()) e.author = 'Author is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.title.trim() || !form.author.trim()) {
-      setFormError('Title and author are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -153,8 +167,8 @@ function BooksTab() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
-            <TextField label="Author" value={form.author} onChangeText={(v) => setForm((f) => ({ ...f, author: v }))} />
+            <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} />
+            <TextField label="Author" required error={errors.author} value={form.author} onChangeText={(v) => setField('author', v)} />
             <TextField label="Category" value={form.category} onChangeText={(v) => setForm((f) => ({ ...f, category: v }))} />
             <TextField label="Copies" type="number" value={form.copies} onChangeText={(v) => setForm((f) => ({ ...f, copies: v }))} />
             <TextField label="Available" type="number" value={form.available} onChangeText={(v) => setForm((f) => ({ ...f, available: v }))} />
@@ -202,6 +216,7 @@ function LoansTab() {
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
   const [returningId, setReturningId] = useState<string | null>(null);
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const bookOptions = (books ?? []).map((b) => ({ label: b.title, value: b.id, sub: b.author }));
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
@@ -218,14 +233,22 @@ function LoansTab() {
     due.setDate(due.getDate() + 14);
     setDueOn(toLocalISODate(due));
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!bookId) e.bookId = 'Book is required';
+    if (!studentId) e.studentId = 'Student is required';
+    if (!issuedOn) e.issuedOn = 'Issue date is required';
+    if (!dueOn) e.dueOn = 'Due date is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleIssue() {
-    if (!bookId || !studentId || !issuedOn || !dueOn) {
-      setFormError('Book, student, issue date, and due date are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -314,11 +337,11 @@ function LoansTab() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Issue book">
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <SearchableSelect label="Book" value={bookId} onChange={setBookId} options={bookOptions} placeholder="Search by title or author…" />
-          <SearchableSelect label="Student" value={studentId} onChange={setStudentId} options={studentOptions} placeholder="Search by name or roll no…" />
+          <SearchableSelect label="Book" required error={errors.bookId} value={bookId} onChange={(v) => { setBookId(v); clearError('bookId'); }} options={bookOptions} placeholder="Search by title or author…" />
+          <SearchableSelect label="Student" required error={errors.studentId} value={studentId} onChange={(v) => { setStudentId(v); clearError('studentId'); }} options={studentOptions} placeholder="Search by name or roll no…" />
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Issued on" value={issuedOn} onChange={setIssuedOn} />
-            <DatePicker label="Due on" value={dueOn} onChange={setDueOn} />
+            <DatePicker label="Issued on" required error={errors.issuedOn} value={issuedOn} onChange={(v) => { setIssuedOn(v); clearError('issuedOn'); }} />
+            <DatePicker label="Due on" required error={errors.dueOn} value={dueOn} onChange={(v) => { setDueOn(v); clearError('dueOn'); }} />
           </div>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />

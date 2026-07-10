@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as placementService from '../../services/placementService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { PlacementApplication, PlacementOpening } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -51,20 +52,34 @@ export function PlacementsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const hasStats = statsData && (statsData.eligible !== undefined || statsData.applied !== undefined || statsData.placed !== undefined);
 
   function openCreate() {
     setForm(emptyOpeningForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.company.trim()) e.company = 'Company is required';
+    if (!form.role.trim()) e.role = 'Role is required';
+    if (!form.location.trim()) e.location = 'Location is required';
+    if (!form.lastDate) e.lastDate = 'Last date is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.company.trim() || !form.role.trim() || !form.location.trim() || !form.lastDate) {
-      setFormError('Company, role, location, and last date are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -172,16 +187,16 @@ export function PlacementsPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Company" value={form.company} onChangeText={(v) => setForm((f) => ({ ...f, company: v }))} />
-            <TextField label="Role" value={form.role} onChangeText={(v) => setForm((f) => ({ ...f, role: v }))} />
+            <TextField label="Company" required error={errors.company} value={form.company} onChangeText={(v) => setField('company', v)} />
+            <TextField label="Role" required error={errors.role} value={form.role} onChangeText={(v) => setField('role', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Location" value={form.location} onChangeText={(v) => setForm((f) => ({ ...f, location: v }))} />
+            <TextField label="Location" required error={errors.location} value={form.location} onChangeText={(v) => setField('location', v)} />
             <TextField label="CTC (Lakhs)" type="number" value={form.ctc} onChangeText={(v) => setForm((f) => ({ ...f, ctc: v }))} />
           </div>
           <TextField label="Eligibility" value={form.eligibility} onChangeText={(v) => setForm((f) => ({ ...f, eligibility: v }))} />
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Last date" value={form.lastDate} onChange={(v) => setForm((f) => ({ ...f, lastDate: v }))} />
+            <DatePicker label="Last date" required error={errors.lastDate} value={form.lastDate} onChange={(v) => setField('lastDate', v)} />
             <Select
               label="Active"
               value={form.active}

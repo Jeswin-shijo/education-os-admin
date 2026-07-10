@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { isEmail } from '../../lib/validation';
 import type { FacultyMember } from '../../data/types';
 import {
   PageHeader,
@@ -36,6 +38,12 @@ export function FacultyPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<FacultyMember | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -46,6 +54,7 @@ export function FacultyPage() {
     setEditing(null);
     setForm(emptyForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -59,14 +68,22 @@ export function FacultyPage() {
       designation: f.designation,
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = 'Full name is required';
+    if (!form.email.trim()) e.email = 'Email is required';
+    else if (!isEmail(form.email)) e.email = 'Enter a valid email';
+    if (!form.department.trim()) e.department = 'Department is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.name.trim() || !form.email.trim() || !form.department.trim()) {
-      setFormError('Name, email, and department are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -169,12 +186,12 @@ export function FacultyPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Full name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
-            <TextField label="Email" type="email" value={form.email} onChangeText={(v) => setForm((f) => ({ ...f, email: v }))} />
-            <TextField label="Phone" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
+            <TextField label="Full name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
+            <TextField label="Email" type="email" autoComplete="off" required error={errors.email} value={form.email} onChangeText={(v) => setField('email', v)} />
+            <TextField label="Phone" autoComplete="off" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
             <TextField label="Designation" value={form.designation} onChangeText={(v) => setForm((f) => ({ ...f, designation: v }))} />
           </div>
-          <TextField label="Department" value={form.department} onChangeText={(v) => setForm((f) => ({ ...f, department: v }))} />
+          <TextField label="Department" required error={errors.department} value={form.department} onChangeText={(v) => setField('department', v)} />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add faculty'} size="sm" loading={saving} onClick={handleSave} />

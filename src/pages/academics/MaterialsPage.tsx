@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as materialService from '../../services/materialService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Material, MaterialKind } from '../../data/types';
 import { formatRelative } from '../../lib';
 import {
@@ -49,6 +50,12 @@ export function MaterialsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -66,14 +73,21 @@ export function MaterialsPage() {
   function openCreate() {
     setForm({ ...emptyForm, subjectId: subjects?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.subjectId) e.subjectId = 'Subject is required';
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.url.trim()) e.url = 'URL is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.subjectId || !form.title.trim() || !form.url.trim()) {
-      setFormError('Subject, title, and URL are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -159,11 +173,13 @@ export function MaterialsPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <Select
             label="Subject"
+            required
+            error={errors.subjectId}
             value={form.subjectId}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+            onChange={(v) => setField('subjectId', v)}
             options={subjectOptions}
           />
-          <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} placeholder="Material title" />
+          <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="Material title" />
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="Kind"
@@ -178,7 +194,7 @@ export function MaterialsPage() {
               placeholder="2.4 MB"
             />
           </div>
-          <TextField label="URL" value={form.url} onChangeText={(v) => setForm((f) => ({ ...f, url: v }))} placeholder="https://…" />
+          <TextField label="URL" required error={errors.url} value={form.url} onChangeText={(v) => setField('url', v)} placeholder="https://…" />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label="Upload material" size="sm" loading={saving} onClick={handleSave} />

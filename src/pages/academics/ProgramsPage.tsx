@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Program } from '../../data/types';
 import {
   PageHeader,
@@ -35,6 +36,12 @@ export function ProgramsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -48,6 +55,7 @@ export function ProgramsPage() {
     setEditing(null);
     setForm({ ...emptyForm, departmentId: departments?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -61,14 +69,21 @@ export function ProgramsPage() {
       intake: String(p.intake),
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.code.trim()) e.code = 'Code is required';
+    if (!form.name.trim()) e.name = 'Name is required';
+    if (!form.departmentId) e.departmentId = 'Department is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.code.trim() || !form.name.trim() || !form.departmentId) {
-      setFormError('Code, name, and department are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -156,12 +171,14 @@ export function ProgramsPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Code" value={form.code} onChangeText={(v) => setForm((f) => ({ ...f, code: v }))} />
-            <TextField label="Name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
+            <TextField label="Code" required error={errors.code} value={form.code} onChangeText={(v) => setField('code', v)} />
+            <TextField label="Name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
             <Select
               label="Department"
+              required
+              error={errors.departmentId}
               value={form.departmentId}
-              onChange={(v) => setForm((f) => ({ ...f, departmentId: v }))}
+              onChange={(v) => setField('departmentId', v)}
               options={departmentOptions}
             />
             <TextField

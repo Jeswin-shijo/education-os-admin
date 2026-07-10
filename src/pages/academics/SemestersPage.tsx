@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Semester } from '../../data/types';
 import {
   PageHeader,
@@ -27,6 +28,7 @@ export function SemestersPage() {
   const [form, setForm] = useState({ programId: '', number: '1' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -36,12 +38,13 @@ export function SemestersPage() {
   function openCreate() {
     setForm({ programId: programs?.[0]?.id ?? '', number: '1' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
   async function handleSave() {
     if (!form.programId) {
-      setFormError('Program is required');
+      setErrors({ programId: 'Program is required' });
       return;
     }
     setSaving(true);
@@ -115,8 +118,10 @@ export function SemestersPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <Select
             label="Program"
+            required
+            error={errors.programId}
             value={form.programId}
-            onChange={(v) => setForm((f) => ({ ...f, programId: v }))}
+            onChange={(v) => { setForm((f) => ({ ...f, programId: v })); clearError('programId'); }}
             options={(programs ?? []).map((p) => ({ label: p.name, value: p.id }))}
           />
           <Select

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { groupBy, keyBy } from '../../lib';
 import type { ClassSession, Section, Weekday } from '../../data/types';
 import {
@@ -57,6 +58,12 @@ export function TimetablePage() {
   const [sectionOptions, setSectionOptions] = useState<Section[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<ClassSession | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -78,6 +85,7 @@ export function TimetablePage() {
   async function handleSubjectChange(subjectId: string) {
     const subject = (subjects ?? []).find((s) => s.id === subjectId);
     setForm((f) => ({ ...f, subjectId, sectionId: '', facultyId: subject?.facultyId ?? f.facultyId }));
+    setErrors((e) => ({ ...e, subjectId: undefined, sectionId: undefined }));
     await loadSectionsForSubject(subjectId);
   }
 
@@ -87,6 +95,7 @@ export function TimetablePage() {
     setForm({ ...emptyFormFor(firstSubjectId), facultyId: subjects?.[0]?.facultyId ?? '' });
     await loadSectionsForSubject(firstSubjectId);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -104,14 +113,23 @@ export function TimetablePage() {
     });
     await loadSectionsForSubject(s.subjectId);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.subjectId) e.subjectId = 'Subject is required';
+    if (!form.start.trim()) e.start = 'Start time is required';
+    if (!form.end.trim()) e.end = 'End time is required';
+    if (!form.room.trim()) e.room = 'Room is required';
+    if (!form.sectionId) e.sectionId = 'Section is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.subjectId || !form.start.trim() || !form.end.trim() || !form.room.trim() || !form.sectionId) {
-      setFormError('Subject, start/end time, room, and section are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -219,7 +237,7 @@ export function TimetablePage() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit session' : 'Add session'} width={520}>
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <Select label="Subject" value={form.subjectId} onChange={handleSubjectChange} options={subjectOptions} />
+          <Select label="Subject" required error={errors.subjectId} value={form.subjectId} onChange={handleSubjectChange} options={subjectOptions} />
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="Day"
@@ -233,13 +251,15 @@ export function TimetablePage() {
               onChange={(v) => setForm((f) => ({ ...f, type: v as ClassSession['type'] }))}
               options={SESSION_TYPES.map((t) => ({ label: t, value: t }))}
             />
-            <TextField label="Start" placeholder="09:00" value={form.start} onChangeText={(v) => setForm((f) => ({ ...f, start: v }))} />
-            <TextField label="End" placeholder="10:00" value={form.end} onChangeText={(v) => setForm((f) => ({ ...f, end: v }))} />
-            <TextField label="Room" value={form.room} onChangeText={(v) => setForm((f) => ({ ...f, room: v }))} />
+            <TextField label="Start" required error={errors.start} placeholder="09:00" value={form.start} onChangeText={(v) => setField('start', v)} />
+            <TextField label="End" required error={errors.end} placeholder="10:00" value={form.end} onChangeText={(v) => setField('end', v)} />
+            <TextField label="Room" required error={errors.room} value={form.room} onChangeText={(v) => setField('room', v)} />
             <Select
               label="Section"
+              required
+              error={errors.sectionId}
               value={form.sectionId}
-              onChange={(v) => setForm((f) => ({ ...f, sectionId: v }))}
+              onChange={(v) => setField('sectionId', v)}
               options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
             />
           </div>

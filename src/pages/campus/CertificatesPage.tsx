@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as certificateService from '../../services/certificateService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Certificate } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -48,21 +49,36 @@ export function CertificatesPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
 
   function openCreate() {
     setForm(emptyForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.studentId) e.studentId = 'Student is required';
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.issuer.trim()) e.issuer = 'Issuer is required';
+    if (!form.issuedOn) e.issuedOn = 'Issued date is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
+    if (!validate()) return;
     const student = students?.find((s) => s.id === form.studentId);
-    if (!student || !form.title.trim() || !form.issuer.trim() || !form.issuedOn) {
-      setFormError('Student, title, issuer, and issued date are required');
-      return;
-    }
+    if (!student) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -120,17 +136,19 @@ export function CertificatesPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <SearchableSelect
             label="Student"
+            required
+            error={errors.studentId}
             value={form.studentId}
-            onChange={(v) => setForm((f) => ({ ...f, studentId: v }))}
+            onChange={(v) => setField('studentId', v)}
             options={studentOptions}
             placeholder="Search by name or roll no…"
           />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
-            <TextField label="Issuer" value={form.issuer} onChangeText={(v) => setForm((f) => ({ ...f, issuer: v }))} />
+            <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} />
+            <TextField label="Issuer" required error={errors.issuer} value={form.issuer} onChangeText={(v) => setField('issuer', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Issued date" value={form.issuedOn} onChange={(v) => setForm((f) => ({ ...f, issuedOn: v }))} />
+            <DatePicker label="Issued date" required error={errors.issuedOn} value={form.issuedOn} onChange={(v) => setField('issuedOn', v)} />
             <Select
               label="Kind"
               value={form.kind}

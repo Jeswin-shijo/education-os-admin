@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as eventService from '../../services/eventService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { EventItem } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -47,6 +48,12 @@ export function EventsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [successMsg, setSuccessMsg] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<EventItem | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -55,14 +62,22 @@ export function EventsPage() {
   function openCreate() {
     setForm(emptyForm);
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.date) e.date = 'Date is required';
+    if (!form.time.trim()) e.time = 'Time is required';
+    if (!form.venue.trim()) e.venue = 'Venue is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.title.trim() || !form.date || !form.time.trim() || !form.venue.trim()) {
-      setFormError('Title, date, time, and venue are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -150,13 +165,13 @@ export function EventsPage() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add event">
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
-          <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
+          <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} />
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Date" value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} />
-            <TextField label="Time" value={form.time} onChangeText={(v) => setForm((f) => ({ ...f, time: v }))} placeholder="e.g. 10:00 AM" />
+            <DatePicker label="Date" required error={errors.date} value={form.date} onChange={(v) => setField('date', v)} />
+            <TextField label="Time" required error={errors.time} value={form.time} onChangeText={(v) => setField('time', v)} placeholder="e.g. 10:00 AM" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Venue" value={form.venue} onChangeText={(v) => setForm((f) => ({ ...f, venue: v }))} />
+            <TextField label="Venue" required error={errors.venue} value={form.venue} onChangeText={(v) => setField('venue', v)} />
             <Select
               label="Category"
               value={form.category}

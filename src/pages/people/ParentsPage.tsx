@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { isEmail } from '../../lib/validation';
 import type { ParentAccount } from '../../data/types';
 import {
   PageHeader,
@@ -38,6 +40,12 @@ export function ParentsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<ParentAccount | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -48,6 +56,7 @@ export function ParentsPage() {
     setEditing(null);
     setForm({ ...emptyForm, childId: students?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -61,14 +70,22 @@ export function ParentsPage() {
       childId: p.childId,
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = 'Full name is required';
+    if (!form.email.trim()) e.email = 'Email is required';
+    else if (!isEmail(form.email)) e.email = 'Enter a valid email';
+    if (!form.childId) e.childId = 'Child is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.name.trim() || !form.email.trim() || !form.childId) {
-      setFormError('Name, email, and child are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -172,15 +189,17 @@ export function ParentsPage() {
         <div className="flex flex-col gap-4">
           {formError && <Banner tone="danger" title={formError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Full name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} />
-            <TextField label="Email" type="email" value={form.email} onChangeText={(v) => setForm((f) => ({ ...f, email: v }))} />
-            <TextField label="Phone" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
+            <TextField label="Full name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
+            <TextField label="Email" type="email" autoComplete="off" required error={errors.email} value={form.email} onChangeText={(v) => setField('email', v)} />
+            <TextField label="Phone" autoComplete="off" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
             <TextField label="Relation" value={form.relation} onChangeText={(v) => setForm((f) => ({ ...f, relation: v }))} />
           </div>
           <Select
             label="Child"
+            required
+            error={errors.childId}
             value={form.childId}
-            onChange={(v) => setForm((f) => ({ ...f, childId: v }))}
+            onChange={(v) => setField('childId', v)}
             options={studentOptions}
           />
           <div className="flex justify-end gap-2">

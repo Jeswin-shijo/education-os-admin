@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as assignmentService from '../../services/assignmentService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Assignment, AssignmentStatus } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -43,6 +44,12 @@ export function AssignmentsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -60,14 +67,21 @@ export function AssignmentsPage() {
   function openCreate() {
     setForm({ ...emptyForm, subjectId: subjects?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.subjectId) e.subjectId = 'Subject is required';
+    if (!form.title.trim()) e.title = 'Title is required';
+    if (!form.dueDate) e.dueDate = 'Due date is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.subjectId || !form.title.trim() || !form.dueDate) {
-      setFormError('Subject, title, and due date are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -152,11 +166,13 @@ export function AssignmentsPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <Select
             label="Subject"
+            required
+            error={errors.subjectId}
             value={form.subjectId}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+            onChange={(v) => setField('subjectId', v)}
             options={subjectOptions}
           />
-          <TextField label="Title" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} placeholder="Assignment title" />
+          <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="Assignment title" />
           <TextField
             label="Description"
             value={form.description}
@@ -164,7 +180,7 @@ export function AssignmentsPage() {
             placeholder="What students need to submit"
           />
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Due date" value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
+            <DatePicker label="Due date" required error={errors.dueDate} value={form.dueDate} onChange={(v) => setField('dueDate', v)} />
             <TextField
               label="Max marks"
               type="number"

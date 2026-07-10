@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { BusLiveStatus, BusRoute, BusStop } from '../../data/types';
 import {
   PageHeader,
@@ -42,11 +43,13 @@ export function TransportPage() {
   const [routeForm, setRouteForm] = useState(emptyRouteForm);
   const [routeSaving, setRouteSaving] = useState(false);
   const [routeFormError, setRouteFormError] = useState<string>();
+  const routeErrors = useFieldErrors();
 
   function openCreateRoute() {
     setEditingRoute(null);
     setRouteForm(emptyRouteForm);
     setRouteFormError(undefined);
+    routeErrors.resetErrors();
     setRouteModalOpen(true);
   }
 
@@ -54,14 +57,16 @@ export function TransportPage() {
     setEditingRoute(r);
     setRouteForm({ name: r.name, number: r.number, driver: r.driver, driverPhone: r.driverPhone });
     setRouteFormError(undefined);
+    routeErrors.resetErrors();
     setRouteModalOpen(true);
   }
 
   async function handleSaveRoute() {
-    if (!routeForm.name.trim() || !routeForm.number.trim()) {
-      setRouteFormError('Route name and number are required');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (!routeForm.name.trim()) e.name = 'Route name is required';
+    if (!routeForm.number.trim()) e.number = 'Route number is required';
+    routeErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     setRouteSaving(true);
     setRouteFormError(undefined);
     try {
@@ -96,18 +101,21 @@ export function TransportPage() {
   const [stopForm, setStopForm] = useState(emptyStopForm);
   const [stopSaving, setStopSaving] = useState(false);
   const [stopFormError, setStopFormError] = useState<string>();
+  const stopErrors = useFieldErrors();
 
   function openCreateStop() {
     setStopForm({ ...emptyStopForm, routeId: routes?.[0]?.id ?? '' });
     setStopFormError(undefined);
+    stopErrors.resetErrors();
     setStopModalOpen(true);
   }
 
   async function handleSaveStop() {
-    if (!stopForm.routeId || !stopForm.name.trim()) {
-      setStopFormError('Route and stop name are required');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (!stopForm.routeId) e.routeId = 'Route is required';
+    if (!stopForm.name.trim()) e.name = 'Stop name is required';
+    stopErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     setStopSaving(true);
     setStopFormError(undefined);
     try {
@@ -132,6 +140,7 @@ export function TransportPage() {
   const [liveStatusForm, setLiveStatusForm] = useState(emptyLiveStatusForm);
   const [liveStatusSaving, setLiveStatusSaving] = useState(false);
   const [liveStatusFormError, setLiveStatusFormError] = useState<string>();
+  const liveErrors = useFieldErrors();
 
   function openUpdateLiveStatus(existing?: BusLiveStatus) {
     if (existing) {
@@ -146,14 +155,17 @@ export function TransportPage() {
       setLiveStatusForm({ ...emptyLiveStatusForm, routeId: routes?.[0]?.id ?? '' });
     }
     setLiveStatusFormError(undefined);
+    liveErrors.resetErrors();
     setLiveStatusModalOpen(true);
   }
 
   async function handleSaveLiveStatus() {
-    if (!liveStatusForm.routeId || !liveStatusForm.currentStop.trim() || !liveStatusForm.nextStop.trim()) {
-      setLiveStatusFormError('Route, current stop, and next stop are required');
-      return;
-    }
+    const e: Record<string, string> = {};
+    if (!liveStatusForm.routeId) e.routeId = 'Route is required';
+    if (!liveStatusForm.currentStop.trim()) e.currentStop = 'Current stop is required';
+    if (!liveStatusForm.nextStop.trim()) e.nextStop = 'Next stop is required';
+    liveErrors.setErrors(e);
+    if (Object.keys(e).length) return;
     setLiveStatusSaving(true);
     setLiveStatusFormError(undefined);
     try {
@@ -307,8 +319,8 @@ export function TransportPage() {
         <div className="flex flex-col gap-4">
           {routeFormError && <Banner tone="danger" title={routeFormError} />}
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Route name" value={routeForm.name} onChangeText={(v) => setRouteForm((f) => ({ ...f, name: v }))} />
-            <TextField label="Route number" value={routeForm.number} onChangeText={(v) => setRouteForm((f) => ({ ...f, number: v }))} />
+            <TextField label="Route name" required error={routeErrors.errors.name} value={routeForm.name} onChangeText={(v) => { setRouteForm((f) => ({ ...f, name: v })); routeErrors.clearError('name'); }} />
+            <TextField label="Route number" required error={routeErrors.errors.number} value={routeForm.number} onChangeText={(v) => { setRouteForm((f) => ({ ...f, number: v })); routeErrors.clearError('number'); }} />
             <TextField label="Driver" value={routeForm.driver} onChangeText={(v) => setRouteForm((f) => ({ ...f, driver: v }))} />
             <TextField label="Driver phone" value={routeForm.driverPhone} onChangeText={(v) => setRouteForm((f) => ({ ...f, driverPhone: v }))} />
           </div>
@@ -324,11 +336,13 @@ export function TransportPage() {
           {stopFormError && <Banner tone="danger" title={stopFormError} />}
           <Select
             label="Route"
+            required
+            error={stopErrors.errors.routeId}
             value={stopForm.routeId}
-            onChange={(v) => setStopForm((f) => ({ ...f, routeId: v }))}
+            onChange={(v) => { setStopForm((f) => ({ ...f, routeId: v })); stopErrors.clearError('routeId'); }}
             options={(routes ?? []).map((r) => ({ label: r.name, value: r.id }))}
           />
-          <TextField label="Stop name" value={stopForm.name} onChangeText={(v) => setStopForm((f) => ({ ...f, name: v }))} />
+          <TextField label="Stop name" required error={stopErrors.errors.name} value={stopForm.name} onChangeText={(v) => { setStopForm((f) => ({ ...f, name: v })); stopErrors.clearError('name'); }} />
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Time" value={stopForm.time} onChangeText={(v) => setStopForm((f) => ({ ...f, time: v }))} placeholder="07:30" />
             <TextField label="Order" type="number" value={stopForm.order} onChangeText={(v) => setStopForm((f) => ({ ...f, order: v }))} />
@@ -345,13 +359,15 @@ export function TransportPage() {
           {liveStatusFormError && <Banner tone="danger" title={liveStatusFormError} />}
           <Select
             label="Route"
+            required
+            error={liveErrors.errors.routeId}
             value={liveStatusForm.routeId}
-            onChange={(v) => setLiveStatusForm((f) => ({ ...f, routeId: v }))}
+            onChange={(v) => { setLiveStatusForm((f) => ({ ...f, routeId: v })); liveErrors.clearError('routeId'); }}
             options={(routes ?? []).map((r) => ({ label: r.name, value: r.id }))}
           />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Current stop" value={liveStatusForm.currentStop} onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, currentStop: v }))} />
-            <TextField label="Next stop" value={liveStatusForm.nextStop} onChangeText={(v) => setLiveStatusForm((f) => ({ ...f, nextStop: v }))} />
+            <TextField label="Current stop" required error={liveErrors.errors.currentStop} value={liveStatusForm.currentStop} onChangeText={(v) => { setLiveStatusForm((f) => ({ ...f, currentStop: v })); liveErrors.clearError('currentStop'); }} />
+            <TextField label="Next stop" required error={liveErrors.errors.nextStop} value={liveStatusForm.nextStop} onChangeText={(v) => { setLiveStatusForm((f) => ({ ...f, nextStop: v })); liveErrors.clearError('nextStop'); }} />
             <TextField
               label="ETA (mins)"
               type="number"

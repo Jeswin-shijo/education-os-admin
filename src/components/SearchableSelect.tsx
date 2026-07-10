@@ -12,12 +12,16 @@ export function SearchableSelect({
   onChange,
   options,
   placeholder = 'Search…',
+  error,
+  required,
 }: {
   label?: string;
   value: string;
   onChange: (value: string) => void;
   options: SearchableOption[];
   placeholder?: string;
+  error?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -72,14 +76,22 @@ export function SearchableSelect({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <span className="text-label uppercase tracking-wide text-ink-muted">{label}</span>}
+      {label && (
+        <span className="text-label uppercase tracking-wide text-ink-muted">
+          {label}
+          {required && <span className="text-danger"> *</span>}
+        </span>
+      )}
       <button
         ref={buttonRef}
         type="button"
+        aria-required={required}
+        aria-invalid={!!error}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 py-2.5 text-left text-body outline-none transition-colors',
+          'flex items-center justify-between gap-2 rounded-md border bg-surface px-3 py-2.5 text-left text-body outline-none transition-colors',
           'hover:border-navy-muted focus:border-navy focus:ring-2 focus:ring-navy-soft',
+          error ? 'border-danger' : 'border-line',
           selected ? 'text-ink' : 'text-ink-soft',
         )}
       >
@@ -124,6 +136,7 @@ export function SearchableSelect({
           </div>
         </div>
       )}
+      {error && <span className="text-caption text-danger">{error}</span>}
     </div>
   );
 }

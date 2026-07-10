@@ -9,6 +9,7 @@ export function Select({
   onChange,
   options,
   error,
+  required,
   className,
 }: {
   label?: string;
@@ -16,11 +17,17 @@ export function Select({
   onChange: (value: string) => void;
   options: Option[];
   error?: string;
+  required?: boolean;
   className?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      {label && <span className="text-label uppercase tracking-wide text-ink-muted">{label}</span>}
+      {label && (
+        <span className="text-label uppercase tracking-wide text-ink-muted">
+          {label}
+          {required && <span className="text-danger"> *</span>}
+        </span>
+      )}
       <span className="relative">
         <select
           value={value}

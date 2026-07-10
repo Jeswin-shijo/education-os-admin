@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as examService from '../../services/examService';
 import { useAsync } from '../../hooks/useAsync';
+import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Exam, ExamType } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -48,6 +49,12 @@ export function ExamsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: val }));
+    clearError(key as string);
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<Exam | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -66,6 +73,7 @@ export function ExamsPage() {
     setEditing(null);
     setForm({ ...emptyForm, subjectId: subjects?.[0]?.id ?? '' });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
@@ -81,14 +89,23 @@ export function ExamsPage() {
       type: exam.type,
     });
     setFormError(undefined);
+    resetErrors();
     setModalOpen(true);
   }
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.subjectId) e.subjectId = 'Subject is required';
+    if (!form.name.trim()) e.name = 'Exam name is required';
+    if (!form.date) e.date = 'Date is required';
+    if (!form.time.trim()) e.time = 'Time is required';
+    if (!form.room.trim()) e.room = 'Room is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function handleSave() {
-    if (!form.subjectId || !form.name.trim() || !form.date || !form.time.trim() || !form.room.trim()) {
-      setFormError('Subject, name, date, time, and room are required');
-      return;
-    }
+    if (!validate()) return;
     setSaving(true);
     setFormError(undefined);
     try {
@@ -183,17 +200,19 @@ export function ExamsPage() {
           {formError && <Banner tone="danger" title={formError} />}
           <Select
             label="Subject"
+            required
+            error={errors.subjectId}
             value={form.subjectId}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+            onChange={(v) => setField('subjectId', v)}
             options={subjectOptions}
           />
-          <TextField label="Exam name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="Mid Semester Exam" />
+          <TextField label="Exam name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} placeholder="Mid Semester Exam" />
           <div className="grid grid-cols-2 gap-3">
-            <DatePicker label="Date" value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} />
-            <TextField label="Time" value={form.time} onChangeText={(v) => setForm((f) => ({ ...f, time: v }))} placeholder="10:00" />
+            <DatePicker label="Date" required error={errors.date} value={form.date} onChange={(v) => setField('date', v)} />
+            <TextField label="Time" required error={errors.time} value={form.time} onChangeText={(v) => setField('time', v)} placeholder="10:00" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Room" value={form.room} onChangeText={(v) => setForm((f) => ({ ...f, room: v }))} placeholder="Hall-A" />
+            <TextField label="Room" required error={errors.room} value={form.room} onChangeText={(v) => setField('room', v)} placeholder="Hall-A" />
             <TextField
               label="Duration (mins)"
               type="number"
