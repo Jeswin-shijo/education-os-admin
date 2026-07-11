@@ -18,3 +18,5 @@ export * from './Table';
 export * from './Modal';
 export * from './ConfirmDialog';
 export * from './PageHeader';
+export * from './Tabs';
+export * from './CommandPalette';

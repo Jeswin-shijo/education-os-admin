@@ -12,21 +12,50 @@ export class ApiError extends Error {
   }
 }
 
-function extractError(data: unknown): { message: string; fieldErrors?: Record<string, string[]> } {
-  if (data && typeof data === 'object') {
-    const obj = data as Record<string, unknown>;
+const GENERIC_ERROR = 'Something went wrong. Please try again.';
+
+// Pull a human message + per-field errors out of an error response. The backend's
+// standard error envelope is `{ status:'error', message, errors:[{field, message}] }`
+// (no `data` key on errors), so we read `message`/`errors` off the envelope itself.
+// Legacy DRF shapes (`{ detail }`, `{ field: [msgs] }`) are still handled as a
+// fallback for any endpoint that hasn't been wrapped in the envelope.
+function extractError(envelope: unknown): { message: string; fieldErrors?: Record<string, string[]> } {
+  if (!envelope || typeof envelope !== 'object') return { message: GENERIC_ERROR };
+  const obj = envelope as Record<string, unknown>;
+
+  const fieldErrors: Record<string, string[]> = {};
+
+  // Standard envelope: errors: [{ field, message }, ...]. Skip DRF's non-field
+  // markers (`detail`, `code`, `non_field_errors`) — those aren't form fields;
+  // their text is already surfaced via the top-level `message`.
+  if (Array.isArray(obj.errors)) {
+    const NON_FIELD = new Set(['detail', 'code', 'non_field_errors', 'token_class', 'token_type', 'message']);
+    for (const e of obj.errors) {
+      if (e && typeof e === 'object') {
+        const field = (e as Record<string, unknown>).field;
+        const msg = (e as Record<string, unknown>).message;
+        if (typeof field === 'string' && field && !NON_FIELD.has(field) && msg != null) {
+          (fieldErrors[field] ??= []).push(String(msg));
+        }
+      }
+    }
+  }
+
+  // Legacy fallbacks when there's no standard envelope message.
+  if (typeof obj.message !== 'string' || !obj.message) {
     if (typeof obj.detail === 'string') return { message: obj.detail };
-    const fieldErrors: Record<string, string[]> = {};
     let first: string | undefined;
     for (const [key, val] of Object.entries(obj)) {
-      if (Array.isArray(val)) {
-        fieldErrors[key] = val.map(String);
+      if (Array.isArray(val) && key !== 'errors' && val.every((v) => typeof v === 'string')) {
+        fieldErrors[key] = (val as string[]).map(String);
         if (!first) first = `${key}: ${val[0]}`;
       }
     }
     if (first) return { message: first, fieldErrors };
   }
-  return { message: 'Something went wrong. Please try again.' };
+
+  const message = typeof obj.message === 'string' && obj.message ? obj.message : GENERIC_ERROR;
+  return Object.keys(fieldErrors).length ? { message, fieldErrors } : { message };
 }
 
 // The Django backend registers every router with `trailing_slash=False` and all
@@ -112,7 +141,10 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
 
   const envelope = json as { status?: string; data?: unknown } | null;
   if (!res.ok || envelope?.status === 'error') {
-    const { message, fieldErrors } = extractError(envelope?.data);
+    // Error envelopes carry the message/errors at the top level (no `data` key),
+    // so extract from the whole envelope — not `envelope.data`, which is undefined
+    // here and would collapse every error to a generic "Something went wrong".
+    const { message, fieldErrors } = extractError(envelope);
     throw new ApiError(message, res.status, fieldErrors);
   }
 

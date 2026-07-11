@@ -7,8 +7,8 @@ import { formatRelative } from '../lib/date';
 
 const quickLinks = [
   { to: '/students', label: 'People', desc: 'Students, faculty, parents, roles', icon: '👥' },
-  { to: '/departments', label: 'Academics', desc: 'Departments, courses, subjects, timetable', icon: '🎓' },
-  { to: '/fees', label: 'Campus', desc: 'Fees, library, hostel, transport, notices', icon: '🏫' },
+  { to: '/academics', label: 'Academics', desc: 'Departments, courses, subjects, timetable', icon: '🎓' },
+  { to: '/campus', label: 'Campus', desc: 'Fees, library, hostel, transport, notices', icon: '🏫' },
   { to: '/audit-logs', label: 'Audit Logs', desc: 'Every change made in this console', icon: '🧾' },
 ];
 
