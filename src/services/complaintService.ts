@@ -17,8 +17,11 @@ async function logAction(action: AuditLog['action'], entity: string, detail: str
 type ComplaintApi = {
   id: string;
   student?: string;
+  student_id?: string;
   student_name?: string;
   studentName?: string;
+  user_name?: string;
+  userName?: string;
   category: string;
   subject: string;
   description: string;
@@ -32,8 +35,8 @@ type MonitorResponse = { complaints?: ComplaintApi[] } | ComplaintApi[];
 function mapComplaint(c: ComplaintApi): Complaint {
   return {
     id: c.id,
-    studentId: c.student,
-    studentName: c.studentName ?? c.student_name,
+    studentId: c.student ?? c.student_id,
+    studentName: c.studentName ?? c.student_name ?? c.userName ?? c.user_name,
     category: c.category,
     subject: c.subject,
     description: c.description,
