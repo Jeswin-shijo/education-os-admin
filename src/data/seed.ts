@@ -22,7 +22,6 @@ import type {
   LeaveRequest,
   Material,
   NotificationItem,
-  ParentAccount,
   PlacementApplication,
   PlacementOpening,
   PlatformUser,
@@ -152,23 +151,15 @@ export const faculty: FacultyMember[] = [
   { id: 'fac-vinod', name: 'Dr. Vinod Kumar', email: 'vinod.kumar@campus.edu.in', phone: '+91 98470 33225', department: 'Mechanical Engineering', designation: 'Professor', avatarColor: NAVY },
 ];
 
-export const parents: ParentAccount[] = [
-  { id: 'par-thomas', name: 'Thomas Varghese', email: 'thomas.varghese@gmail.com', phone: '+91 98470 55001', relation: 'Father', childId: 'stu-abin', avatarColor: TEAL },
-  { id: 'par-pillai', name: 'Sunitha Pillai', email: 'sunitha.pillai@gmail.com', phone: '+91 98470 55002', relation: 'Mother', childId: 'stu-002', avatarColor: PURPLE },
-  { id: 'par-nair', name: 'Ramesh Nair', email: 'ramesh.nair@gmail.com', phone: '+91 98470 55003', relation: 'Father', childId: 'stu-003', avatarColor: INFO },
-  { id: 'par-varma', name: 'Suresh Varma', email: 'suresh.varma@gmail.com', phone: '+91 98470 55004', relation: 'Father', childId: 'stu-004', avatarColor: PINK },
-];
-
 export const platformUsers: PlatformUser[] = [
   { id: 'usr-student', name: 'Abin Thomas', email: 'abin.thomas@campus.edu.in', role: 'student', active: true, avatarColor: NAVY },
-  { id: 'usr-parent', name: 'Thomas Varghese', email: 'thomas.varghese@gmail.com', role: 'parent', active: true, avatarColor: TEAL },
   { id: 'usr-faculty', name: 'Dr. Rajesh Menon', email: 'rajesh.menon@campus.edu.in', role: 'faculty', active: true, avatarColor: PURPLE },
   { id: 'usr-hod', name: 'Dr. Suresh Pillai', email: 'suresh.pillai@campus.edu.in', role: 'hod', active: true, avatarColor: WARNING },
   { id: 'usr-principal', name: 'Dr. Geetha Krishnan', email: 'principal@campus.edu.in', role: 'principal', active: true, avatarColor: PINK },
   { id: 'usr-admin', name: 'Campus Admin', email: 'admin@campus.edu.in', role: 'admin', active: true, avatarColor: INFO },
 ];
 
-export const CORE_USER_IDS = ['usr-student', 'usr-parent', 'usr-faculty', 'usr-hod', 'usr-principal', 'usr-admin'];
+export const CORE_USER_IDS = ['usr-student', 'usr-faculty', 'usr-hod', 'usr-principal', 'usr-admin'];
 
 const SEC_A = sectionId('prog-cse', 5, 'A');
 const SEC_B = sectionId('prog-cse', 5, 'B');

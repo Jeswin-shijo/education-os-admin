@@ -22,7 +22,6 @@ import type {
   LeaveRequest,
   Material,
   NotificationItem,
-  ParentAccount,
   PlacementApplication,
   PlacementOpening,
   PlatformUser,
@@ -38,7 +37,6 @@ import type {
 export type Collections = {
   students: Student[];
   faculty: FacultyMember[];
-  parents: ParentAccount[];
   platformUsers: PlatformUser[];
   departments: Department[];
   programs: Program[];
@@ -73,7 +71,6 @@ export type Collections = {
 const collectionNames = [
   'students',
   'faculty',
-  'parents',
   'platformUsers',
   'departments',
   'programs',

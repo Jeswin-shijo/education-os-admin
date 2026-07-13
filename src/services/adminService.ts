@@ -25,7 +25,6 @@ import type {
   HostelBlock,
   HostelRoom,
   NotificationItem,
-  ParentAccount,
   PaymentMethod,
   PlatformUser,
   Program,
@@ -95,11 +94,10 @@ export function paginateLocal<T>(rows: T[], page: number): Paginated<T> {
 export async function getDashboard(): Promise<AdminDashboard> {
   return fromSource(
     async () => {
-      const [studentsList, facultyList, parentsList, departmentsList, programsList, subjectsList, feesList, notificationsList, audits] =
+      const [studentsList, facultyList, departmentsList, programsList, subjectsList, feesList, notificationsList, audits] =
         await Promise.all([
           db.read('students'),
           db.read('faculty'),
-          db.read('parents'),
           db.read('departments'),
           db.read('programs'),
           db.read('subjects'),
@@ -111,7 +109,6 @@ export async function getDashboard(): Promise<AdminDashboard> {
         counts: {
           students: studentsList.length,
           faculty: facultyList.length,
-          parents: parentsList.length,
           departments: departmentsList.length,
           courses: programsList.length,
           subjects: subjectsList.length,
@@ -135,7 +132,6 @@ export async function getDashboard(): Promise<AdminDashboard> {
         counts: {
           students: studentsList.length,
           faculty: 0,
-          parents: 0,
           departments: departmentsList.length,
           courses: programsList.length,
           subjects: subjectsList.length,
@@ -480,84 +476,6 @@ export const faculty = {
       async () => {
         await http.delete(`/api/v1/faculty/${id}`);
         await logAction('delete', 'Faculty', `Removed faculty ${id}`);
-      },
-    );
-  },
-};
-
-// =====================================================================================
-// Parents — create via /auth/register (role:'parent'); list via /admin/users filtered.
-// =====================================================================================
-export const parents = {
-  async list(q?: string): Promise<ParentAccount[]> {
-    return fromSource(
-      async () => {
-        const rows = await db.read('parents');
-        return q ? rows.filter((p) => matches([p.name, p.email, p.relation], q)) : rows;
-      },
-      async () => {
-        const rows = await http.get<{ id: string; name: string; email: string; role: string }[]>('/api/v1/admin/users');
-        const parentRows: ParentAccount[] = rows
-          .filter((u) => u.role === 'parent')
-          .map((u) => ({ id: u.id, name: u.name, email: u.email, phone: '', relation: '', childId: '', avatarColor: '#0D9488' }));
-        return q ? parentRows.filter((p) => matches([p.name, p.email, p.relation], q)) : parentRows;
-      },
-    );
-  },
-  async create(input: Omit<ParentAccount, 'id'> & { password?: string }): Promise<ParentAccount> {
-    return fromSource(
-      async () => {
-        const row: ParentAccount = { ...input, id: genId('par') };
-        await db.upsert('parents', row);
-        await logAction('create', 'Parent', `Added parent ${row.name}`);
-        return row;
-      },
-      async () => {
-        const data = await http.post<{ id: string; name: string; email: string; phone: string }>('/api/v1/auth/register', {
-          email: input.email,
-          full_name: input.name,
-          role: 'parent',
-          password: input.password,
-          phone: input.phone,
-        });
-        const row: ParentAccount = { ...input, id: data.id, name: data.name, email: data.email, phone: data.phone };
-        await logAction('create', 'Parent', `Added parent ${row.name}`);
-        return row;
-      },
-    );
-  },
-  async update(id: string, patch: Partial<Omit<ParentAccount, 'id'>>): Promise<ParentAccount> {
-    return fromSource(
-      async () => {
-        const rows = await db.read('parents');
-        const existing = rows.find((p) => p.id === id);
-        if (!existing) throw new Error('Parent not found');
-        const updated = { ...existing, ...patch };
-        await db.upsert('parents', updated);
-        await logAction('update', 'Parent', `Updated parent ${updated.name}`);
-        return updated;
-      },
-      async () => {
-        await http.patch(`/api/v1/admin/users/${id}/`, patch);
-        const rows = await this.list();
-        const updated = rows.find((p) => p.id === id);
-        if (!updated) throw new Error('Parent not found after update');
-        await logAction('update', 'Parent', `Updated parent ${updated.name}`);
-        return updated;
-      },
-    );
-  },
-  async remove(id: string): Promise<void> {
-    return fromSource(
-      async () => {
-        const rows = await db.read('parents');
-        const existing = rows.find((p) => p.id === id);
-        await db.removeById('parents', id);
-        await logAction('delete', 'Parent', `Removed parent ${existing?.name ?? id}`);
-      },
-      async () => {
-        await http.delete(`/api/v1/admin/users/${id}/`);
-        await logAction('delete', 'Parent', `Removed parent ${id}`);
       },
     );
   },

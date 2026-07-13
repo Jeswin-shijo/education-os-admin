@@ -72,7 +72,7 @@ const paths: Record<IconName, string> = {
   hostel: 'M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1z',
   transport: 'M4 16V7a2 2 0 012-2h12a2 2 0 012 2v9M4 16a1 1 0 001 1h1a1 1 0 001-1M4 16h16M18 16a1 1 0 001 1h1a1 1 0 001-1M7 19h.01M17 19h.01',
   notification: 'M18 8a6 6 0 00-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14 18 8zM13.73 18a2 2 0 01-3.46 0',
-  // People group — Parents keeps the two-person 'people' glyph (family); these three are distinct
+  // People group — these glyphs are distinct
   student: 'M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5M22 10v6',
   faculty: 'M4 4h16v14a2 2 0 01-2 2H6a2 2 0 01-2-2zM12 11a3 3 0 100-6 3 3 0 000 6zM8 21v-2a4 4 0 018 0v2',
   role: 'M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6zM9.5 12l2 2 3.5-3.5',

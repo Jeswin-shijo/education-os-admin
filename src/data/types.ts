@@ -1,4 +1,4 @@
-export type Role = 'student' | 'parent' | 'faculty' | 'hod' | 'principal' | 'admin';
+export type Role = 'student' | 'faculty' | 'hod' | 'principal' | 'admin';
 export type Weekday = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
 
 export type AdminAccount = {
@@ -53,16 +53,6 @@ export type FacultyCandidate = {
   id: string;
   fullName: string;
   email: string;
-};
-
-export type ParentAccount = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  relation: string;
-  childId: string;
-  avatarColor: string;
 };
 
 export type PlatformUser = {
@@ -277,7 +267,6 @@ export type AdminDashboard = {
   counts: {
     students: number;
     faculty: number;
-    parents: number;
     departments: number;
     courses: number;
     subjects: number;

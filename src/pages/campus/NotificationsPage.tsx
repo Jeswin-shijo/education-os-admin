@@ -45,7 +45,6 @@ const categoryTone: Record<NotificationItem['category'], 'create' | 'update' | '
 const roleOptions: { label: string; value: Role | '' }[] = [
   { label: 'All roles', value: '' },
   { label: 'Student', value: 'student' },
-  { label: 'Parent', value: 'parent' },
   { label: 'Faculty', value: 'faculty' },
   { label: 'HOD', value: 'hod' },
   { label: 'Admin', value: 'admin' },
