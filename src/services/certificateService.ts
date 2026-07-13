@@ -17,7 +17,9 @@ async function logAction(action: AuditLog['action'], entity: string, detail: str
 type CertificateApi = {
   id: string;
   student?: string;
+  student_id?: string;
   student_name?: string;
+  studentName?: string;
   title: string;
   issuer: string;
   issued_on: string;
@@ -28,8 +30,8 @@ type CertificateApi = {
 function mapCertificate(c: CertificateApi): Certificate {
   return {
     id: c.id,
-    studentId: c.student ?? '',
-    studentName: c.student_name,
+    studentId: c.student ?? c.student_id ?? '',
+    studentName: c.studentName ?? c.student_name,
     title: c.title,
     issuer: c.issuer,
     issuedOn: c.issued_on,

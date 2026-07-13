@@ -17,7 +17,9 @@ async function logAction(action: AuditLog['action'], entity: string, detail: str
 type LeaveApi = {
   id: string;
   student?: string;
+  student_id?: string;
   student_name?: string;
+  studentName?: string;
   type: LeaveRequest['type'];
   from_date: string;
   to_date: string;
@@ -29,8 +31,8 @@ type LeaveApi = {
 function mapLeave(l: LeaveApi): LeaveRequest {
   return {
     id: l.id,
-    studentId: l.student ?? '',
-    studentName: l.student_name,
+    studentId: l.student ?? l.student_id ?? '',
+    studentName: l.studentName ?? l.student_name,
     type: l.type,
     fromDate: l.from_date,
     toDate: l.to_date,

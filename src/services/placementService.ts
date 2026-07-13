@@ -85,22 +85,27 @@ export const openings = {
 type ApplicationApi = {
   id: string;
   opening?: string;
+  openingId?: string;
   company_role?: string;
-  student: string;
-  student_name: string;
+  companyRole?: string;
+  student?: string;
+  student_id?: string;
+  student_name?: string;
+  studentName?: string;
   status: PlacementApplication['status'];
   applied_on: string;
+  appliedOn?: string;
 };
 
 function mapApplication(a: ApplicationApi): PlacementApplication {
   return {
     id: a.id,
-    openingId: a.opening ?? '',
-    companyRole: a.company_role ?? '',
-    studentId: a.student ?? '',
-    studentName: a.student_name ?? '',
+    openingId: a.opening ?? a.openingId ?? '',
+    companyRole: a.companyRole ?? a.company_role ?? '',
+    studentId: a.student ?? a.student_id ?? '',
+    studentName: a.studentName ?? a.student_name ?? '',
     status: a.status,
-    appliedOn: a.applied_on,
+    appliedOn: a.appliedOn ?? a.applied_on,
   };
 }
 
