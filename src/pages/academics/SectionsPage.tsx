@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
-import type { Section } from '../../data/types';
+import type { Section, Shift } from '../../data/types';
+
+const SHIFT_OPTIONS: { label: string; value: Shift }[] = [
+  { label: 'Morning', value: 'Morning' },
+  { label: 'Afternoon', value: 'Afternoon' },
+  { label: 'Evening', value: 'Evening' },
+];
 import {
   PageHeader,
   Button,
@@ -30,7 +36,7 @@ export function SectionsPage() {
   };
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ semesterId: '', name: 'A' });
+  const [form, setForm] = useState<{ semesterId: string; name: string; shift: Shift }>({ semesterId: '', name: 'A', shift: 'Morning' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
@@ -41,7 +47,7 @@ export function SectionsPage() {
   const [successMsg, setSuccessMsg] = useState<string>();
 
   function openCreate() {
-    setForm({ semesterId: semesters?.[0]?.id ?? '', name: 'A' });
+    setForm({ semesterId: semesters?.[0]?.id ?? '', name: 'A', shift: 'Morning' });
     setFormError(undefined);
     resetErrors();
     setModalOpen(true);
@@ -60,7 +66,7 @@ export function SectionsPage() {
     setSaving(true);
     setFormError(undefined);
     try {
-      await adminService.sections.create({ semesterId: form.semesterId, name: form.name.trim().toUpperCase() });
+      await adminService.sections.create({ semesterId: form.semesterId, name: form.name.trim().toUpperCase(), shift: form.shift });
       setSuccessMsg(`Added section ${form.name}`);
       setModalOpen(false);
       reload();
@@ -89,6 +95,7 @@ export function SectionsPage() {
   const columns: Column<Section>[] = [
     { key: 'semester', header: 'Semester', render: (s) => semesterLabel(s.semesterId) },
     { key: 'name', header: 'Section', render: (s) => s.name },
+    { key: 'shift', header: 'Shift', render: (s) => s.shift ?? '—' },
     {
       key: 'actions',
       header: '',
@@ -135,6 +142,12 @@ export function SectionsPage() {
             options={(semesters ?? []).map((s) => ({ label: semesterLabel(s.id), value: s.id }))}
           />
           <TextField label="Section name" required error={errors.name} value={form.name} onChangeText={(v) => { setForm((f) => ({ ...f, name: v })); clearError('name'); }} placeholder="A" />
+          <Select
+            label="Shift"
+            value={form.shift}
+            onChange={(v) => setForm((f) => ({ ...f, shift: v as Shift }))}
+            options={SHIFT_OPTIONS}
+          />
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label="Add section" size="sm" loading={saving} onClick={handleSave} />

@@ -33,6 +33,8 @@ export type Student = {
   dob: string;
 };
 
+export type Shift = 'Morning' | 'Afternoon' | 'Evening';
+
 export type FacultyMember = {
   id: string;
   name: string;
@@ -40,6 +42,9 @@ export type FacultyMember = {
   phone: string;
   department: string;
   designation: string;
+  qualifications?: string;
+  experience?: string;
+  photoUrl?: string;
   avatarColor: string;
 };
 
@@ -102,6 +107,7 @@ export type Section = {
   id: string;
   semesterId: string;
   name: string;
+  shift?: Shift;
 };
 
 export type Subject = {
@@ -110,11 +116,17 @@ export type Subject = {
   name: string;
   credits: number;
   departmentId: string;
+  programId?: string;
   semesterId: string;
-  facultyId?: string;
+  academicSession?: string; // e.g. "2026-2027"
+  facultyIds?: string[]; // multiple faculty
+  facultyNames?: string[];
+  facultyId?: string; // legacy single (back-compat)
   facultyName?: string;
   color: string;
 };
+
+export type SessionStatus = 'active' | 'inactive';
 
 export type ClassSession = {
   id: string;
@@ -122,9 +134,13 @@ export type ClassSession = {
   sectionId: string;
   facultyId?: string;
   facultyName?: string;
+  academicSession?: string;
+  shift?: Shift;
+  status?: SessionStatus;
   day: Weekday;
   start: string;
   end: string;
+  durationMins?: number; // auto-computed (end - start)
   room: string;
   type: 'Lecture' | 'Lab' | 'Tutorial';
 };

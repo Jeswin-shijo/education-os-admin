@@ -189,6 +189,11 @@ export function ProgramsPage() {
             />
             <TextField label="Intake" type="number" value={form.intake} onChangeText={(v) => setForm((f) => ({ ...f, intake: v }))} />
           </div>
+          {!editing && (
+            <p className="text-caption text-ink-soft">
+              Semesters 1–{(Number(form.durationYears) || 0) * 2} are generated automatically when the program is created.
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add program'} size="sm" loading={saving} onClick={handleSave} />

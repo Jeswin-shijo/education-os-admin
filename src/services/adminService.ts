@@ -32,6 +32,7 @@ import type {
   Role,
   Section,
   Semester,
+  Shift,
   Student,
   Subject,
   Weekday,
@@ -290,9 +291,41 @@ export const students = {
 };
 
 // =====================================================================================
-// Faculty — real create via /auth/register (role:'faculty'); real list has no dedicated
-// "all faculty" endpoint documented, so we reuse /subjects/faculty-candidates.
+// Faculty — real reads/writes go through the dedicated FacultyProfile CRUD endpoint
+// (`/api/v1/faculty`). Its rows carry the faculty user's name/email/phone plus the
+// profile's department/designation and the personal-info fields the console surfaces
+// (qualifications, experience, photo_url). Create POSTs to the same endpoint, which
+// provisions the underlying faculty *user account* AND its profile in one call — the
+// `department` ref accepts an id/code/name, so the console's department string resolves
+// server-side; all profile fields persist at create time.
 // =====================================================================================
+type FacultyApi = {
+  id: string;
+  user_name?: string;
+  user_email?: string;
+  phone?: string;
+  department?: string; // department FK id
+  department_name?: string; // human-readable
+  designation?: string;
+  qualifications?: string;
+  experience?: string;
+  photo_url?: string;
+};
+function mapFacultyFromApi(f: FacultyApi): FacultyMember {
+  return {
+    id: f.id,
+    name: f.user_name ?? '',
+    email: f.user_email ?? '',
+    phone: f.phone ?? '',
+    department: f.department_name ?? '',
+    designation: f.designation ?? '',
+    qualifications: f.qualifications ?? '',
+    experience: f.experience ?? '',
+    photoUrl: f.photo_url || undefined,
+    avatarColor: '#7C3AED',
+  };
+}
+
 export const faculty = {
   async list(q?: string): Promise<FacultyMember[]> {
     return fromSource(
@@ -301,17 +334,9 @@ export const faculty = {
         return q ? rows.filter((f) => matches([f.name, f.email, f.department], q)) : rows;
       },
       async () => {
-        const candidates = await http.get<{ id: string; full_name: string; email: string }[]>('/api/v1/subjects/faculty-candidates');
-        const rows: FacultyMember[] = candidates.map((c) => ({
-          id: c.id,
-          name: c.full_name,
-          email: c.email,
-          phone: '',
-          department: '',
-          designation: '',
-          avatarColor: '#7C3AED',
-        }));
-        return q ? rows.filter((f) => matches([f.name, f.email, f.department], q)) : rows;
+        const rows = await http.get<FacultyApi[]>('/api/v1/faculty');
+        const mapped = rows.map(mapFacultyFromApi);
+        return q ? mapped.filter((f) => matches([f.name, f.email, f.department], q)) : mapped;
       },
     );
   },
@@ -324,14 +349,21 @@ export const faculty = {
         return row;
       },
       async () => {
-        const data = await http.post<{ id: string; name: string; email: string; phone: string }>('/api/v1/auth/register', {
-          email: input.email,
+        // One call creates the faculty User + FacultyProfile. `department` accepts an
+        // id/code/name; profile fields (designation/qualifications/experience/photo_url)
+        // persist server-side. Response mirrors a list row → map it straight back.
+        const data = await http.post<FacultyApi>('/api/v1/faculty', {
           full_name: input.name,
-          role: 'faculty',
-          password: input.password,
+          email: input.email,
           phone: input.phone,
+          department: input.department,
+          designation: input.designation,
+          qualifications: input.qualifications,
+          experience: input.experience,
+          photo_url: input.photoUrl ?? '',
+          ...(input.password ? { password: input.password } : {}),
         });
-        const row: FacultyMember = { ...input, id: data.id, name: data.name, email: data.email, phone: data.phone };
+        const row = mapFacultyFromApi(data);
         await logAction('create', 'Faculty', `Added faculty ${row.name}`);
         return row;
       },
@@ -349,8 +381,16 @@ export const faculty = {
         return updated;
       },
       async () => {
-        // No dedicated faculty-profile update endpoint documented; best-effort conventional path.
-        await http.patch(`/api/v1/admin/users/${id}/`, patch);
+        // PATCH the FacultyProfile (id from list() is the profile id). Only the
+        // profile-owned fields are writable here — name/email live on the user and
+        // are read-only on this endpoint. phone is synced back to the user server-side.
+        const body: Record<string, unknown> = {};
+        if (patch.phone !== undefined) body.phone = patch.phone;
+        if (patch.designation !== undefined) body.designation = patch.designation;
+        if (patch.qualifications !== undefined) body.qualifications = patch.qualifications;
+        if (patch.experience !== undefined) body.experience = patch.experience;
+        if (patch.photoUrl !== undefined) body.photo_url = patch.photoUrl ?? '';
+        await http.patch(`/api/v1/faculty/${id}`, body);
         const rows = await this.list();
         const updated = rows.find((f) => f.id === id);
         if (!updated) throw new Error('Faculty not found after update');
@@ -368,7 +408,7 @@ export const faculty = {
         await logAction('delete', 'Faculty', `Removed faculty ${existing?.name ?? id}`);
       },
       async () => {
-        await http.delete(`/api/v1/admin/users/${id}/`);
+        await http.delete(`/api/v1/faculty/${id}`);
         await logAction('delete', 'Faculty', `Removed faculty ${id}`);
       },
     );
@@ -625,6 +665,8 @@ export const programs = {
         return row;
       },
       async () => {
+        // Post ONLY the program — the backend auto-generates its semesters
+        // (durationYears * 2), so we never send a semester count/list here.
         const data = await http.post<{ id: string; code: string; name: string; department: string; duration_years: number; intake: number }>(
           '/api/v1/programs/',
           { code: input.code, name: input.name, department: input.departmentId, duration_years: input.durationYears, intake: input.intake },
@@ -740,8 +782,8 @@ export const sections = {
       },
       async () => {
         const path = semesterIdFilter ? `/api/v1/sections/?semester=${semesterIdFilter}` : '/api/v1/sections/';
-        const rows = await http.get<{ id: string; semester: string; name: string }[]>(path);
-        return rows.map((s) => ({ id: s.id, semesterId: s.semester, name: s.name }));
+        const rows = await http.get<{ id: string; semester: string; name: string; shift?: Shift }[]>(path);
+        return rows.map((s) => ({ id: s.id, semesterId: s.semester, name: s.name, shift: s.shift }));
       },
     );
   },
@@ -754,11 +796,12 @@ export const sections = {
         return row;
       },
       async () => {
-        const data = await http.post<{ id: string; semester: string; name: string }>('/api/v1/sections/', {
+        const data = await http.post<{ id: string; semester: string; name: string; shift?: Shift }>('/api/v1/sections/', {
           semester: input.semesterId,
           name: input.name,
+          ...(input.shift && { shift: input.shift }),
         });
-        const row: Section = { id: data.id, semesterId: data.semester, name: data.name };
+        const row: Section = { id: data.id, semesterId: data.semester, name: data.name, shift: data.shift ?? input.shift };
         await logAction('create', 'Section', `Added section ${row.name}`);
         return row;
       },
@@ -781,6 +824,40 @@ export const sections = {
 // =====================================================================================
 // Subjects
 // =====================================================================================
+type RawSubject = {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  department: string;
+  program?: string;
+  semester: string;
+  academic_session?: string;
+  faculty?: string; // legacy single
+  faculty_name?: string; // legacy single
+  faculties?: string[];
+  faculty_names?: string[];
+  color?: string;
+};
+
+function mapSubject(s: RawSubject): Subject {
+  return {
+    id: s.id,
+    code: s.code,
+    name: s.name,
+    credits: s.credits,
+    departmentId: s.department,
+    programId: s.program,
+    semesterId: s.semester,
+    academicSession: s.academic_session,
+    facultyIds: s.faculties,
+    facultyNames: s.faculty_names,
+    facultyId: s.faculty,
+    facultyName: s.faculty_name,
+    color: s.color ?? '#13327F',
+  };
+}
+
 export const subjects = {
   async list(q?: string): Promise<Subject[]> {
     return fromSource(
@@ -789,21 +866,9 @@ export const subjects = {
         return q ? rows.filter((s) => matches([s.name, s.code, s.facultyName], q)) : rows;
       },
       async () => {
-        const rows = await http.get<
-          { id: string; code: string; name: string; credits: number; department: string; semester: string; faculty?: string; faculty_name?: string; color?: string }[]
-        >('/api/v1/subjects/');
-        const mapped: Subject[] = rows.map((s) => ({
-          id: s.id,
-          code: s.code,
-          name: s.name,
-          credits: s.credits,
-          departmentId: s.department,
-          semesterId: s.semester,
-          facultyId: s.faculty,
-          facultyName: s.faculty_name,
-          color: s.color ?? '#13327F',
-        }));
-        return q ? mapped.filter((s) => matches([s.name, s.code, s.facultyName], q)) : mapped;
+        const rows = await http.get<RawSubject[]>('/api/v1/subjects/');
+        const mapped = rows.map(mapSubject);
+        return q ? mapped.filter((s) => matches([s.name, s.code, s.facultyName, ...(s.facultyNames ?? [])], q)) : mapped;
       },
     );
   },
@@ -828,11 +893,18 @@ export const subjects = {
         return row;
       },
       async () => {
-        const data = await http.post<{ id: string; code: string; name: string; credits: number; department: string; semester: string; faculty?: string; faculty_name?: string; color?: string }>(
-          '/api/v1/subjects/',
-          { code: input.code, name: input.name, credits: input.credits, department: input.departmentId, semester: input.semesterId, faculty: input.facultyId, color: input.color },
-        );
-        const row: Subject = { id: data.id, code: data.code, name: data.name, credits: data.credits, departmentId: data.department, semesterId: data.semester, facultyId: data.faculty, facultyName: data.faculty_name, color: data.color ?? input.color };
+        const data = await http.post<RawSubject>('/api/v1/subjects/', {
+          code: input.code,
+          name: input.name,
+          credits: input.credits,
+          department: input.departmentId,
+          semester: input.semesterId,
+          ...(input.programId && { program: input.programId }),
+          ...(input.academicSession && { academic_session: input.academicSession }),
+          ...(input.facultyIds && { faculties: input.facultyIds }),
+          color: input.color,
+        });
+        const row: Subject = { ...mapSubject(data), color: data.color ?? input.color };
         await logAction('create', 'Subject', `Added subject ${row.name}`);
         return row;
       },
@@ -855,8 +927,10 @@ export const subjects = {
           ...(patch.name && { name: patch.name }),
           ...(patch.credits !== undefined && { credits: patch.credits }),
           ...(patch.departmentId && { department: patch.departmentId }),
+          ...(patch.programId && { program: patch.programId }),
           ...(patch.semesterId && { semester: patch.semesterId }),
-          ...(patch.facultyId && { faculty: patch.facultyId }),
+          ...(patch.academicSession && { academic_session: patch.academicSession }),
+          ...(patch.facultyIds && { faculties: patch.facultyIds }),
           ...(patch.color && { color: patch.color }),
         });
         const rows = await this.list();
@@ -887,25 +961,40 @@ export const subjects = {
 // =====================================================================================
 // Timetable
 // =====================================================================================
+// Maps a raw backend session (snake_case) → ClassSession. Backend now also carries
+// academic_session / shift / status / duration_mins, so map them everywhere.
+function mapClassSession(s: Record<string, unknown>): ClassSession {
+  return {
+    id: s.id as string,
+    subjectId: s.subject as string,
+    sectionId: s.section as string,
+    facultyId: s.faculty as string | undefined,
+    facultyName: s.faculty_name as string | undefined,
+    academicSession: s.academic_session as string | undefined,
+    shift: s.shift as ClassSession['shift'],
+    status: s.status as ClassSession['status'],
+    day: s.day as Weekday,
+    start: s.start as string,
+    end: s.end as string,
+    durationMins: s.duration_mins as number | undefined,
+    room: s.room as string,
+    type: s.type as ClassSession['type'],
+  };
+}
+
 export const timetable = {
-  async list(): Promise<ClassSession[]> {
+  // `facultyId` filters the week by faculty via the backend `?faculty=<id>` param.
+  async list(facultyId?: string): Promise<ClassSession[]> {
     return fromSource(
-      () => db.read('sessions'),
       async () => {
-        const week = await http.get<unknown>('/api/v1/timetable/week');
+        const rows = await db.read('sessions');
+        return facultyId ? rows.filter((s) => s.facultyId === facultyId) : rows;
+      },
+      async () => {
+        const path = facultyId ? `/api/v1/timetable/week?faculty=${encodeURIComponent(facultyId)}` : '/api/v1/timetable/week';
+        const week = await http.get<unknown>(path);
         const rows: unknown[] = Array.isArray(week) ? week : Object.values(week as Record<string, unknown[]>).flat();
-        return (rows as Record<string, unknown>[]).map((s) => ({
-          id: s.id as string,
-          subjectId: s.subject as string,
-          sectionId: s.section as string,
-          facultyId: s.faculty as string | undefined,
-          facultyName: s.faculty_name as string | undefined,
-          day: s.day as Weekday,
-          start: s.start as string,
-          end: s.end as string,
-          room: s.room as string,
-          type: s.type as ClassSession['type'],
-        }));
+        return (rows as Record<string, unknown>[]).map(mapClassSession);
       },
     );
   },
@@ -921,18 +1010,7 @@ export const timetable = {
       },
       async () => {
         const rows = await http.get<Record<string, unknown>[]>('/api/v1/timetable/today');
-        return rows.map((s) => ({
-          id: s.id as string,
-          subjectId: s.subject as string,
-          sectionId: s.section as string,
-          facultyId: s.faculty as string | undefined,
-          facultyName: s.faculty_name as string | undefined,
-          day: s.day as Weekday,
-          start: s.start as string,
-          end: s.end as string,
-          room: s.room as string,
-          type: s.type as ClassSession['type'],
-        }));
+        return rows.map(mapClassSession);
       },
     );
   },
@@ -954,19 +1032,12 @@ export const timetable = {
           end: input.end,
           room: input.room,
           type: input.type,
+          academic_session: input.academicSession,
+          shift: input.shift,
+          status: input.status,
+          duration_mins: input.durationMins,
         });
-        const row: ClassSession = {
-          id: data.id as string,
-          subjectId: data.subject as string,
-          sectionId: data.section as string,
-          facultyId: data.faculty as string | undefined,
-          facultyName: data.faculty_name as string | undefined,
-          day: data.day as Weekday,
-          start: data.start as string,
-          end: data.end as string,
-          room: data.room as string,
-          type: data.type as ClassSession['type'],
-        };
+        const row = mapClassSession(data);
         await logAction('create', 'Timetable', `Added session for ${row.subjectId} on ${row.day}`);
         return row;
       },
@@ -993,6 +1064,10 @@ export const timetable = {
           ...(patch.end && { end: patch.end }),
           ...(patch.room && { room: patch.room }),
           ...(patch.type && { type: patch.type }),
+          ...(patch.academicSession !== undefined && { academic_session: patch.academicSession }),
+          ...(patch.shift !== undefined && { shift: patch.shift }),
+          ...(patch.status !== undefined && { status: patch.status }),
+          ...(patch.durationMins !== undefined && { duration_mins: patch.durationMins }),
         });
         const rows = await this.list();
         const updated = rows.find((s) => s.id === id);

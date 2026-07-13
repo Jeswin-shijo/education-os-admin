@@ -13,6 +13,7 @@ import {
   Modal,
   TextField,
   Select,
+  SearchableSelect,
   Badge,
   ConfirmDialog,
   Banner,
@@ -27,9 +28,10 @@ const emptyForm = {
   name: '',
   credits: '3',
   departmentId: '',
-  programId: '', // transient — only used to filter the Semester dropdown, not stored on Subject
+  programId: '',
   semesterId: '',
-  facultyId: '',
+  academicSession: '',
+  facultyIds: [] as string[],
 };
 
 export function SubjectsPage() {
@@ -60,6 +62,11 @@ export function SubjectsPage() {
   const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
   const departmentName = (id: string) => departments?.find((d) => d.id === id)?.name ?? '—';
   const facultyName = (id?: string) => facultyCandidates?.find((f) => f.id === id)?.fullName ?? '—';
+  const facultyDisplay = (s: Subject) => {
+    if (s.facultyNames && s.facultyNames.length) return s.facultyNames.join(', ');
+    if (s.facultyIds && s.facultyIds.length) return s.facultyIds.map((id) => facultyName(id)).join(', ');
+    return s.facultyName ?? facultyName(s.facultyId);
+  };
   const programsForDept = (departmentId: string) => (allPrograms ?? []).filter((p) => p.departmentId === departmentId);
 
   async function loadSemesters(programId: string) {
@@ -84,8 +91,8 @@ export function SubjectsPage() {
 
   async function openEdit(s: Subject) {
     setEditing(s);
-    // Best-effort: find which program this subject's semester belongs to, for the cascade.
-    const owningProgramId = (allPrograms ?? []).find((p) => p.departmentId === s.departmentId)?.id ?? '';
+    // Prefer the subject's own program; fall back to the first program in its department for the cascade.
+    const owningProgramId = s.programId ?? (allPrograms ?? []).find((p) => p.departmentId === s.departmentId)?.id ?? '';
     setForm({
       code: s.code,
       name: s.name,
@@ -93,7 +100,8 @@ export function SubjectsPage() {
       departmentId: s.departmentId,
       programId: owningProgramId,
       semesterId: s.semesterId,
-      facultyId: s.facultyId ?? '',
+      academicSession: s.academicSession ?? '',
+      facultyIds: s.facultyIds ?? (s.facultyId ? [s.facultyId] : []),
     });
     await loadSemesters(owningProgramId);
     setFormError(undefined);
@@ -101,16 +109,26 @@ export function SubjectsPage() {
     setModalOpen(true);
   }
 
+  function addFaculty(id: string) {
+    if (!id) return;
+    setForm((f) => (f.facultyIds.includes(id) ? f : { ...f, facultyIds: [...f.facultyIds, id] }));
+    clearError('faculty');
+  }
+
+  function removeFaculty(id: string) {
+    setForm((f) => ({ ...f, facultyIds: f.facultyIds.filter((x) => x !== id) }));
+  }
+
   async function handleDepartmentChange(departmentId: string) {
     const firstProgram = programsForDept(departmentId)[0]?.id ?? '';
     setForm((f) => ({ ...f, departmentId, programId: firstProgram, semesterId: '' }));
-    setErrors((e) => ({ ...e, departmentId: undefined, semesterId: undefined }));
+    setErrors((e) => ({ ...e, departmentId: undefined, programId: undefined, semesterId: undefined }));
     await loadSemesters(firstProgram);
   }
 
   async function handleProgramChange(programId: string) {
     setForm((f) => ({ ...f, programId, semesterId: '' }));
-    setErrors((e) => ({ ...e, semesterId: undefined }));
+    setErrors((e) => ({ ...e, programId: undefined, semesterId: undefined }));
     await loadSemesters(programId);
   }
 
@@ -119,7 +137,11 @@ export function SubjectsPage() {
     if (!form.code.trim()) e.code = 'Code is required';
     if (!form.name.trim()) e.name = 'Name is required';
     if (!form.departmentId) e.departmentId = 'Department is required';
+    if (!form.programId) e.programId = 'Program is required';
     if (!form.semesterId) e.semesterId = 'Semester is required';
+    if (!form.credits.trim() || Number(form.credits) <= 0) e.credits = 'Credits are required';
+    if (!form.academicSession.trim()) e.academicSession = 'Academic session is required';
+    if (form.facultyIds.length === 0) e.faculty = 'At least one faculty is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -134,9 +156,11 @@ export function SubjectsPage() {
         name: form.name,
         credits: Number(form.credits) || 1,
         departmentId: form.departmentId,
+        programId: form.programId,
         semesterId: form.semesterId,
-        facultyId: form.facultyId || undefined,
-        facultyName: form.facultyId ? facultyName(form.facultyId) : undefined,
+        academicSession: form.academicSession.trim(),
+        facultyIds: form.facultyIds,
+        facultyNames: form.facultyIds.map((id) => facultyName(id)),
         color: editing?.color ?? NAVY,
       };
       if (editing) {
@@ -185,7 +209,8 @@ export function SubjectsPage() {
       ),
     },
     { key: 'credits', header: 'Credits', render: (s) => s.credits },
-    { key: 'faculty', header: 'Faculty', render: (s) => s.facultyName ?? facultyName(s.facultyId) },
+    { key: 'session', header: 'Session', render: (s) => s.academicSession ?? '—' },
+    { key: 'faculty', header: 'Faculty', render: (s) => facultyDisplay(s) },
     { key: 'department', header: 'Department', render: (s) => departmentName(s.departmentId) },
     {
       key: 'actions',
@@ -243,16 +268,20 @@ export function SubjectsPage() {
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Code" required error={errors.code} value={form.code} onChangeText={(v) => setField('code', v)} />
             <TextField label="Name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} />
-            <TextField label="Credits" type="number" value={form.credits} onChangeText={(v) => setForm((f) => ({ ...f, credits: v }))} />
-            <Select
-              label="Faculty"
-              value={form.facultyId}
-              onChange={(v) => setForm((f) => ({ ...f, facultyId: v }))}
-              options={[{ label: 'Unassigned', value: '' }, ...(facultyCandidates ?? []).map((c) => ({ label: c.fullName, value: c.id }))]}
+            <TextField label="Credits" required type="number" error={errors.credits} value={form.credits} onChangeText={(v) => setField('credits', v)} />
+            <TextField
+              label="Academic Session"
+              required
+              error={errors.academicSession}
+              value={form.academicSession}
+              onChangeText={(v) => setField('academicSession', v)}
+              placeholder="2026-2027"
             />
             <Select label="Department" required error={errors.departmentId} value={form.departmentId} onChange={handleDepartmentChange} options={departmentOptions} />
             <Select
               label="Program"
+              required
+              error={errors.programId}
               value={form.programId}
               onChange={handleProgramChange}
               options={programsForDept(form.departmentId).map((p) => ({ label: p.name, value: p.id }))}
@@ -265,6 +294,37 @@ export function SubjectsPage() {
               onChange={(v) => setField('semesterId', v)}
               options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <span className="text-label uppercase tracking-wide text-ink-muted">
+                Faculty<span className="text-danger"> *</span>
+              </span>
+              <SearchableSelect
+                value=""
+                placeholder="Add faculty…"
+                error={errors.faculty}
+                onChange={addFaculty}
+                options={(facultyCandidates ?? [])
+                  .filter((c) => !form.facultyIds.includes(c.id))
+                  .map((c) => ({ label: c.fullName, value: c.id, sub: c.email }))}
+              />
+              {form.facultyIds.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {form.facultyIds.map((id) => (
+                    <span key={id} className="inline-flex items-center gap-1.5 rounded-full bg-navy-soft px-2.5 py-1 text-caption text-navy">
+                      {facultyName(id)}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${facultyName(id)}`}
+                        onClick={() => removeFaculty(id)}
+                        className="leading-none text-ink-soft hover:text-danger"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />

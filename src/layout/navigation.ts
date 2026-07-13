@@ -50,7 +50,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: '/students', label: 'Students', icon: 'student' },
       { to: '/faculty', label: 'Faculty', icon: 'faculty' },
-      { to: '/parents', label: 'Parents', icon: 'people' },
       { to: '/users', label: 'Users & Roles', icon: 'role' },
     ],
   },

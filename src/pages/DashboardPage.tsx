@@ -6,7 +6,7 @@ import { Card, StatCard, Loading, Badge, PageHeader } from '../components';
 import { formatRelative } from '../lib/date';
 
 const quickLinks = [
-  { to: '/students', label: 'People', desc: 'Students, faculty, parents, roles', icon: '👥' },
+  { to: '/students', label: 'People', desc: 'Students, faculty, roles', icon: '👥' },
   { to: '/academics', label: 'Academics', desc: 'Departments, courses, subjects, timetable', icon: '🎓' },
   { to: '/campus', label: 'Campus', desc: 'Fees, library, hostel, transport, notices', icon: '🏫' },
   { to: '/audit-logs', label: 'Audit Logs', desc: 'Every change made in this console', icon: '🧾' },
@@ -34,7 +34,6 @@ export function DashboardPage() {
           <div className="mb-6 flex flex-wrap gap-3">
             <StatCard label="Students" value={data.counts.students} icon="people" tone="navy" />
             <StatCard label="Faculty" value={data.counts.faculty} icon="people" tone="purple" />
-            <StatCard label="Parents" value={data.counts.parents} icon="people" tone="teal" />
             <StatCard label="Departments" value={data.counts.departments} icon="academics" tone="warning" />
             <StatCard label="Courses" value={data.counts.courses} icon="academics" tone="info" />
             <StatCard label="Subjects" value={data.counts.subjects} icon="academics" tone="pink" />

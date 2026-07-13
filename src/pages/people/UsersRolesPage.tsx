@@ -16,7 +16,8 @@ import {
   EmptyState,
 } from '../../components';
 
-const ROLES: Role[] = ['student', 'parent', 'faculty', 'hod', 'principal', 'admin'];
+// 'parent' is intentionally omitted — parents can no longer log in to the platform.
+const ROLES: Role[] = ['student', 'faculty', 'hod', 'principal', 'admin'];
 
 const roleOptions = ROLES.map((r) => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
 

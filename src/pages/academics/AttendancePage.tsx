@@ -1,18 +1,28 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
+import * as attendanceService from '../../services/attendanceService';
+import type { AttendanceBreakdownRow } from '../../services/attendanceService';
 import { useAsync } from '../../hooks/useAsync';
 import { formatPercent } from '../../lib';
 import { toLocalISODate } from '../../lib/date';
 import type { AttendanceStatus, Student } from '../../data/types';
-import { PageHeader, Card, StatCard, Loading, EmptyState, Chip, Button, Banner, Avatar } from '../../components';
+import { PageHeader, Card, Loading, EmptyState, Chip, Button, Banner, Avatar, Icon, type IconName } from '../../components';
 
-const barToneClasses: Record<'good' | 'warn' | 'bad', string> = {
+type Tone = 'good' | 'warn' | 'bad';
+
+const barToneClasses: Record<Tone, string> = {
   good: 'bg-success',
   warn: 'bg-warning',
   bad: 'bg-danger',
 };
 
-function toneFor(percent: number): 'good' | 'warn' | 'bad' {
+const ringToneText: Record<Tone, string> = {
+  good: 'text-success',
+  warn: 'text-warning',
+  bad: 'text-danger',
+};
+
+function toneFor(percent: number): Tone {
   if (percent >= 75) return 'good';
   if (percent >= 60) return 'warn';
   return 'bad';
@@ -25,35 +35,132 @@ const statusButtonClasses: Record<AttendanceStatus, string> = {
   late: 'bg-warning text-white border-warning',
 };
 
-function OverviewTab() {
-  const { data, loading } = useAsync(() => adminService.attendance.overview(), []);
-
-  if (loading) return <Loading />;
-  if (!data || data.byClass.length === 0) {
-    return <EmptyState icon="academics" title="No attendance data yet" message="Attendance will appear here once class sessions are recorded." />;
-  }
+// Headline ring for the overall college figure. The track and the progress arc each
+// carry their own text-colour token and paint via currentColor, so the arc colours by
+// value (green / amber / red) using the shared design-system tokens.
+function AttendanceRing({ percent }: { percent: number }) {
+  const size = 128;
+  const stroke = 12;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const offset = circumference * (1 - clamped / 100);
   return (
-    <>
-      <div className="mb-4 flex flex-wrap gap-3">
-        <StatCard label="Overall attendance" value={formatPercent(data.overallPercent)} icon="check" tone="success" />
-        <StatCard label="Sessions recorded" value={data.sessionsRecorded} icon="audit" tone="navy" />
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle className="text-line-soft" cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} />
+        <circle
+          className={ringToneText[toneFor(percent)]}
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-display leading-none text-ink">{Math.round(percent)}%</span>
+        <span className="text-caption uppercase tracking-wide text-ink-soft">overall</span>
       </div>
-      <Card>
+    </div>
+  );
+}
+
+// Colour key so the value-based colouring is never conveyed by colour alone.
+function ThresholdLegend() {
+  const items: { tone: Tone; label: string }[] = [
+    { tone: 'good', label: 'Good · 75%+' },
+    { tone: 'warn', label: 'At risk · 60–74%' },
+    { tone: 'bad', label: 'Low · below 60%' },
+  ];
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+      {items.map((i) => (
+        <span key={i.tone} className="flex items-center gap-1.5 text-caption text-ink-muted">
+          <span className={`h-2.5 w-2.5 rounded-full ${barToneClasses[i.tone]}`} />
+          {i.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// A single breakdown (Department / Program / Faculty) as a card of horizontal % bars.
+function BreakdownCard({ title, icon, rows, emptyMessage }: { title: string; icon: IconName; rows: AttendanceBreakdownRow[]; emptyMessage: string }) {
+  const sorted = [...rows].sort((a, b) => b.percent - a.percent);
+  return (
+    <Card>
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-navy-soft text-navy">
+          <Icon name={icon} size={16} />
+        </div>
+        <div className="text-title text-ink">{title}</div>
+        {rows.length > 0 && <div className="ml-auto text-caption text-ink-soft">{rows.length}</div>}
+      </div>
+      {sorted.length === 0 ? (
+        <div className="py-8 text-center text-small text-ink-soft">{emptyMessage}</div>
+      ) : (
         <div className="flex flex-col divide-y divide-line-soft">
-          {data.byClass.map((entry) => (
-            <div key={entry.label} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
-              <div className="w-56 shrink-0 truncate text-body font-semibold text-ink">{entry.label}</div>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-line-soft">
-                <div className={`h-full rounded-full ${barToneClasses[toneFor(entry.percent)]}`} style={{ width: `${entry.percent}%` }} />
+          {sorted.map((row) => (
+            <div key={row.key} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                <span className="truncate text-body font-semibold text-ink">{row.label}</span>
+                <span className="shrink-0 text-small font-semibold text-ink-muted">{formatPercent(row.percent)}</span>
               </div>
-              <div className="w-32 shrink-0 text-right text-small text-ink-muted">
-                {formatPercent(entry.percent)} · {entry.sessions} sessions
+              <div className="h-2 overflow-hidden rounded-full bg-line-soft">
+                <div className={`h-full rounded-full ${barToneClasses[toneFor(row.percent)]}`} style={{ width: `${Math.max(0, Math.min(100, row.percent))}%` }} />
               </div>
             </div>
           ))}
         </div>
+      )}
+    </Card>
+  );
+}
+
+function OverviewTab() {
+  const { data, loading, error } = useAsync(() => attendanceService.analytics(), []);
+
+  if (loading) return <Loading />;
+  if (error) return <Banner tone="danger" title="Could not load attendance analytics" message={error.message} />;
+
+  const isEmpty = !data || (data.overallPercent === 0 && data.byDepartment.length === 0 && data.byProgram.length === 0 && data.byFaculty.length === 0);
+  if (isEmpty) {
+    return <EmptyState icon="academics" title="No attendance data yet" message="Attendance analytics will appear here once class sessions are recorded." />;
+  }
+
+  const overallCaption: Record<Tone, string> = {
+    good: 'Healthy — most students are attending regularly.',
+    warn: 'At risk — attendance is dipping in some areas.',
+    bad: 'Critical — attendance needs attention.',
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* 1. Overall college attendance — headline */}
+      <Card>
+        <div className="flex flex-wrap items-center gap-6">
+          <AttendanceRing percent={data.overallPercent} />
+          <div className="min-w-0 flex-1">
+            <div className="text-label uppercase tracking-wide text-ink-soft">Overall College Attendance</div>
+            <div className="mt-1 text-h2 text-ink">{overallCaption[toneFor(data.overallPercent)]}</div>
+            <p className="mt-1 mb-3 text-small text-ink-muted">Aggregated across every department, program and faculty member.</p>
+            <ThresholdLegend />
+          </div>
+        </div>
       </Card>
-    </>
+
+      {/* 2–4. Department-, program- and faculty-wise breakdowns */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <BreakdownCard title="Department-wise" icon="department" rows={data.byDepartment} emptyMessage="No department data yet." />
+        <BreakdownCard title="Program-wise" icon="course" rows={data.byProgram} emptyMessage="No program data yet." />
+        <BreakdownCard title="Faculty-wise" icon="faculty" rows={data.byFaculty} emptyMessage="No faculty data yet." />
+      </div>
+    </div>
   );
 }
 
@@ -226,7 +333,7 @@ export function AttendancePage() {
     <div>
       <PageHeader
         title="Attendance"
-        subtitle={tab === 'overview' ? 'Computed from recorded class sessions' : "Mark today's attendance period by period"}
+        subtitle={tab === 'overview' ? 'College-wide attendance across departments, programs and faculty' : "Mark today's attendance period by period"}
         action={
           <div className="flex gap-2">
             <Chip label="Overview" selected={tab === 'overview'} onClick={() => setTab('overview')} />

@@ -27,6 +27,9 @@ const emptyForm = {
   phone: '',
   department: '',
   designation: '',
+  qualifications: '',
+  experience: '',
+  photoUrl: '',
 };
 
 export function FacultyPage() {
@@ -66,6 +69,9 @@ export function FacultyPage() {
       phone: f.phone,
       department: f.department,
       designation: f.designation,
+      qualifications: f.qualifications ?? '',
+      experience: f.experience ?? '',
+      photoUrl: f.photoUrl ?? '',
     });
     setFormError(undefined);
     resetErrors();
@@ -93,6 +99,9 @@ export function FacultyPage() {
         phone: form.phone,
         department: form.department,
         designation: form.designation,
+        qualifications: form.qualifications,
+        experience: form.experience,
+        photoUrl: form.photoUrl,
         avatarColor: editing?.avatarColor ?? PURPLE,
       };
       if (editing) {
@@ -132,7 +141,7 @@ export function FacultyPage() {
       header: 'Faculty',
       render: (f) => (
         <div className="flex items-center gap-3">
-          <Avatar name={f.name} size={32} color={f.avatarColor} />
+          <Avatar name={f.name} size={32} color={f.avatarColor} uri={f.photoUrl} />
           <div>
             <div className="font-semibold text-ink">{f.name}</div>
             <div className="text-caption text-ink-soft">{f.email}</div>
@@ -192,6 +201,36 @@ export function FacultyPage() {
             <TextField label="Designation" value={form.designation} onChangeText={(v) => setForm((f) => ({ ...f, designation: v }))} />
           </div>
           <TextField label="Department" required error={errors.department} value={form.department} onChangeText={(v) => setField('department', v)} />
+          <div className="flex items-end gap-3">
+            {form.photoUrl && <Avatar name={form.name || 'Faculty'} size={44} color={editing?.avatarColor ?? PURPLE} uri={form.photoUrl} />}
+            <div className="flex-1">
+              <TextField
+                label="Profile picture URL"
+                autoComplete="off"
+                placeholder="https://…"
+                value={form.photoUrl}
+                onChangeText={(v) => setForm((f) => ({ ...f, photoUrl: v }))}
+              />
+            </div>
+          </div>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-label uppercase tracking-wide text-ink-muted">Educational qualifications</span>
+            <textarea
+              rows={3}
+              value={form.qualifications}
+              onChange={(e) => setForm((f) => ({ ...f, qualifications: e.target.value }))}
+              className="resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-body text-ink outline-none transition-colors focus:border-navy focus:ring-2 focus:ring-navy-soft"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-label uppercase tracking-wide text-ink-muted">Previous work experience</span>
+            <textarea
+              rows={3}
+              value={form.experience}
+              onChange={(e) => setForm((f) => ({ ...f, experience: e.target.value }))}
+              className="resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-body text-ink outline-none transition-colors focus:border-navy focus:ring-2 focus:ring-navy-soft"
+            />
+          </label>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add faculty'} size="sm" loading={saving} onClick={handleSave} />

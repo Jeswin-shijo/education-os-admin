@@ -6,7 +6,6 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { StudentsPage } from './pages/people/StudentsPage';
 import { FacultyPage } from './pages/people/FacultyPage';
-import { ParentsPage } from './pages/people/ParentsPage';
 import { UsersRolesPage } from './pages/people/UsersRolesPage';
 import { DepartmentsPage } from './pages/academics/DepartmentsPage';
 import { ProgramsPage } from './pages/academics/ProgramsPage';
@@ -42,7 +41,6 @@ function App() {
         {/* People */}
         <Route path="/students" element={<StudentsPage />} />
         <Route path="/faculty" element={<FacultyPage />} />
-        <Route path="/parents" element={<ParentsPage />} />
         <Route path="/users" element={<UsersRolesPage />} />
 
         {/* Academics — structural config grouped under one tabbed hub */}
