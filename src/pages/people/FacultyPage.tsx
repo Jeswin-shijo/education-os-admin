@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { isEmail } from '../../lib/validation';
 import type { FacultyMember } from '../../data/types';
@@ -13,10 +14,12 @@ import {
   Avatar,
   Modal,
   TextField,
+  Select,
   ConfirmDialog,
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const PURPLE = '#7C3AED';
@@ -35,7 +38,8 @@ const emptyForm = {
 
 export function FacultyPage() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.faculty.list(q), [q]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.faculty.listPage(q, p), [q]);
+  const { data: departments } = useAsync(() => adminService.departments.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FacultyMember | null>(null);
@@ -201,10 +205,13 @@ export function FacultyPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="people" title="No faculty found" actionLabel="Add faculty" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit faculty' : 'Add faculty'}>
@@ -216,7 +223,17 @@ export function FacultyPage() {
             <TextField label="Phone" autoComplete="off" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
             <TextField label="Designation" value={form.designation} onChangeText={(v) => setForm((f) => ({ ...f, designation: v }))} />
           </div>
-          <TextField label="Department" required error={errors.department} value={form.department} onChangeText={(v) => setField('department', v)} />
+          <Select
+            label="Department"
+            required
+            error={errors.department}
+            value={form.department}
+            onChange={(v) => setField('department', v)}
+            options={[
+              { label: '— Select department —', value: '' },
+              ...(departments ?? []).map((d) => ({ label: d.name, value: d.name })),
+            ]}
+          />
           <div className="flex items-center gap-3">
             <Avatar name={form.name || 'Faculty'} size={44} color={editing?.avatarColor ?? PURPLE} uri={form.photoUrl || undefined} />
             <div className="flex-1">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Department } from '../../data/types';
 import {
@@ -14,6 +15,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 // Standard department code/name presets — keeps entries consistent instead of free text.
@@ -39,7 +41,7 @@ const emptyForm = {
 };
 
 export function DepartmentsPage() {
-  const { data: rows, loading, reload } = useAsync(() => adminService.departments.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.departments.listPage(p), []);
   const { data: hodCandidates } = useAsync(() => adminService.departments.hodCandidates(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -172,10 +174,13 @@ export function DepartmentsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="campus" title="No departments found" actionLabel="Add department" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit department' : 'Add department'}>

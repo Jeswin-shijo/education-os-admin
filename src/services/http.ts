@@ -105,7 +105,13 @@ type RequestOptions = {
   body?: unknown;
   form?: FormData;
   auth?: boolean; // default true
+  // When true, return the whole envelope `data` (e.g. `{results, pagination}`)
+  // instead of auto-unwrapping `data.results`. Used by `getPaginated`.
+  raw?: boolean;
 };
+
+export type Pagination = { count: number; page: number; limit: number; totalPages: number };
+export type Paginated<T> = { results: T[]; pagination: Pagination };
 
 async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
   const { method = 'GET', body, form, auth = true } = options;
@@ -149,10 +155,19 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   }
 
   const data = envelope?.data;
-  if (data && typeof data === 'object' && 'results' in (data as Record<string, unknown>)) {
+  if (!options.raw && data && typeof data === 'object' && 'results' in (data as Record<string, unknown>)) {
     return (data as Record<string, unknown>).results as T;
   }
   return data as T;
+}
+
+/** Build a query string from params, dropping empty/undefined values. */
+function toQuery(params?: Record<string, string | number | undefined | null>): string {
+  if (!params) return '';
+  const pairs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+  return pairs.length ? `?${pairs.join('&')}` : '';
 }
 
 export const http = {
@@ -165,4 +180,35 @@ export const http = {
     request<T>(path, { ...opts, method: 'POST', form }),
   patchForm: <T>(path: string, form: FormData, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) =>
     request<T>(path, { ...opts, method: 'PATCH', form }),
+  /**
+   * GET a paginated list, returning both `results` and normalized `pagination`
+   * ({count, page, limit, totalPages}). `params` (page/limit/filters) is appended
+   * as a query string. Falls back to a single-page shape if the endpoint isn't
+   * paginated (e.g. returns a bare array).
+   */
+  getPaginated: async <T>(
+    path: string,
+    params?: Record<string, string | number | undefined | null>,
+  ): Promise<Paginated<T>> => {
+    const sep = path.includes('?') ? '&' : '';
+    const qs = toQuery(params);
+    const full = qs ? `${path}${sep}${qs.slice(sep ? 1 : 0)}` : path;
+    const data = await request<
+      { results?: T[]; pagination?: { count?: number; page?: number; limit?: number; total_pages?: number } } | T[]
+    >(full, { method: 'GET', raw: true });
+    if (Array.isArray(data)) {
+      return { results: data, pagination: { count: data.length, page: 1, limit: data.length || 25, totalPages: 1 } };
+    }
+    const results = data.results ?? [];
+    const p = data.pagination ?? {};
+    return {
+      results,
+      pagination: {
+        count: p.count ?? results.length,
+        page: p.page ?? 1,
+        limit: p.limit ?? 25,
+        totalPages: p.total_pages ?? 1,
+      },
+    };
+  },
 };

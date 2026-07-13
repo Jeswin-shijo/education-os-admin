@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { FeeInvoice, PaymentMethod } from '../../data/types';
 import { formatINR, formatDate } from '../../lib';
@@ -20,6 +21,7 @@ import {
   Loading,
   EmptyState,
   Icon,
+  Pagination,
 } from '../../components';
 
 type LineItem = { key: number; title: string; term: string; amount: string; dueDate: string };
@@ -41,7 +43,7 @@ const statusTone: Record<FeeInvoice['status'], 'success' | 'info' | 'danger'> = 
 
 export function FeesPage() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.fees.list(q), [q]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.fees.listPage(q, p), [q]);
   const { data: students } = useAsync(() => adminService.students.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -186,10 +188,13 @@ export function FeesPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="campus" title="No invoices found" actionLabel="Add invoice" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add invoice(s)" width={560}>

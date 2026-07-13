@@ -1,7 +1,8 @@
 import * as db from './db';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
+import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { AuditLog, Exam, ExamResult } from '../data/types';
 
 function genId(prefix: string): string {
@@ -59,6 +60,16 @@ export const exams = {
       async () => {
         const rows = await http.get<ExamApi[]>('/api/v1/exams/');
         return rows.map(mapExam);
+      },
+    );
+  },
+  /** Server-paginated list for the table (25/page). */
+  async listPage(page: number): Promise<Paginated<Exam>> {
+    return fromSource(
+      async () => paginateLocal(await db.read('exams'), page),
+      async () => {
+        const res = await http.getPaginated<ExamApi>('/api/v1/exams/', { page, limit: PAGE_SIZE });
+        return { results: res.results.map(mapExam), pagination: res.pagination };
       },
     );
   },
@@ -186,6 +197,16 @@ export const results = {
       async () => {
         const rows = await http.get<ExamResultApi[]>('/api/v1/results/');
         return rows.map(mapResult);
+      },
+    );
+  },
+  /** Server-paginated list for the table (25/page). */
+  async listPage(page: number): Promise<Paginated<ExamResult>> {
+    return fromSource(
+      async () => paginateLocal(await db.read('examResults'), page),
+      async () => {
+        const res = await http.getPaginated<ExamResultApi>('/api/v1/results/', { page, limit: PAGE_SIZE });
+        return { results: res.results.map(mapResult), pagination: res.pagination };
       },
     );
   },

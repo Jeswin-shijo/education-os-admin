@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { HostelAllocation, HostelBlock, HostelRoom } from '../../data/types';
 import { formatINR } from '../../lib';
@@ -18,6 +19,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 type Tab = 'blocks' | 'rooms' | 'allocations';
@@ -30,14 +32,37 @@ export function HostelPage() {
   const [tab, setTab] = useState<Tab>('blocks');
   const [successMsg, setSuccessMsg] = useState<string>();
 
-  const { data: blocks, loading: blocksLoading, reload: reloadBlocks } = useAsync(() => adminService.hostel.blocks.list(), []);
-  const { data: rooms, loading: roomsLoading, reload: reloadRooms } = useAsync(() => adminService.hostel.rooms.list(), []);
+  // Full lists power cross-tab labels + the form dropdowns; the tables read from the
+  // paginated hooks below. Blocks/rooms are referenced by the room & allocation forms,
+  // so both the full list and the paged table are kept in sync on mutations.
+  const { data: blocks, reload: reloadBlockList } = useAsync(() => adminService.hostel.blocks.list(), []);
+  const { data: rooms, reload: reloadRoomList } = useAsync(() => adminService.hostel.rooms.list(), []);
+  const { data: students } = useAsync(() => adminService.students.list(), []);
+
   const {
-    data: allocations,
+    rows: blockRows,
+    pagination: blockPagination,
+    page: blockPage,
+    setPage: setBlockPage,
+    loading: blocksLoading,
+    reload: reloadBlocks,
+  } = usePaginatedList((p) => adminService.hostel.blocks.listPage(p), []);
+  const {
+    rows: roomRows,
+    pagination: roomPagination,
+    page: roomPage,
+    setPage: setRoomPage,
+    loading: roomsLoading,
+    reload: reloadRooms,
+  } = usePaginatedList((p) => adminService.hostel.rooms.listPage(undefined, p), []);
+  const {
+    rows: allocationRows,
+    pagination: allocationPagination,
+    page: allocationPage,
+    setPage: setAllocationPage,
     loading: allocationsLoading,
     reload: reloadAllocations,
-  } = useAsync(() => adminService.hostel.allocations.list(), []);
-  const { data: students } = useAsync(() => adminService.students.list(), []);
+  } = usePaginatedList((p) => adminService.hostel.allocations.listPage(p), []);
 
   const blockName = (id: string) => blocks?.find((b) => b.id === id)?.name ?? '—';
   const roomLabel = (id: string) => {
@@ -80,6 +105,7 @@ export function HostelPage() {
       setSuccessMsg(`Added block "${blockForm.name}"`);
       setBlockModalOpen(false);
       reloadBlocks();
+      reloadBlockList();
     } catch (err) {
       setBlockFormError(err instanceof Error ? err.message : 'Could not save block');
     } finally {
@@ -95,6 +121,7 @@ export function HostelPage() {
       await adminService.hostel.blocks.remove(blockDeleteTarget.id);
       setBlockDeleteTarget(null);
       reloadBlocks();
+      reloadBlockList();
     } catch (err) {
       setBlockDeleteError(err instanceof Error ? err.message : 'Could not remove block');
     } finally {
@@ -133,6 +160,7 @@ export function HostelPage() {
       setSuccessMsg(`Added room ${roomForm.roomNo}`);
       setRoomModalOpen(false);
       reloadRooms();
+      reloadRoomList();
     } catch (err) {
       setRoomFormError(err instanceof Error ? err.message : 'Could not save room');
     } finally {
@@ -265,15 +293,18 @@ export function HostelPage() {
       {tab === 'blocks' && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-small text-ink-muted">{blocks ? `${blocks.length} blocks` : ''}</span>
+            <span className="text-small text-ink-muted">{`${blockPagination.count} blocks`}</span>
             <Button label="Add block" icon="plus" size="sm" onClick={openCreateBlock} />
           </div>
           {blocksLoading ? (
             <Loading />
-          ) : !blocks || blocks.length === 0 ? (
+          ) : blockRows.length === 0 ? (
             <EmptyState icon="hostel" title="No hostel blocks found" actionLabel="Add block" onAction={openCreateBlock} />
           ) : (
-            <Table columns={blockColumns} rows={blocks} />
+            <>
+              <Table columns={blockColumns} rows={blockRows} />
+              <Pagination page={blockPage} totalPages={blockPagination.totalPages} count={blockPagination.count} limit={blockPagination.limit} onPageChange={setBlockPage} />
+            </>
           )}
         </div>
       )}
@@ -281,15 +312,18 @@ export function HostelPage() {
       {tab === 'rooms' && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-small text-ink-muted">{rooms ? `${rooms.length} rooms` : ''}</span>
+            <span className="text-small text-ink-muted">{`${roomPagination.count} rooms`}</span>
             <Button label="Add room" icon="plus" size="sm" onClick={openCreateRoom} disabled={!blocks || blocks.length === 0} />
           </div>
           {roomsLoading ? (
             <Loading />
-          ) : !rooms || rooms.length === 0 ? (
+          ) : roomRows.length === 0 ? (
             <EmptyState icon="hostel" title="No rooms found" actionLabel="Add room" onAction={openCreateRoom} />
           ) : (
-            <Table columns={roomColumns} rows={rooms} />
+            <>
+              <Table columns={roomColumns} rows={roomRows} />
+              <Pagination page={roomPage} totalPages={roomPagination.totalPages} count={roomPagination.count} limit={roomPagination.limit} onPageChange={setRoomPage} />
+            </>
           )}
         </div>
       )}
@@ -297,15 +331,18 @@ export function HostelPage() {
       {tab === 'allocations' && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-small text-ink-muted">{allocations ? `${allocations.length} allocations` : ''}</span>
+            <span className="text-small text-ink-muted">{`${allocationPagination.count} allocations`}</span>
             <Button label="Add allocation" icon="plus" size="sm" onClick={openCreateAllocation} disabled={!rooms || rooms.length === 0} />
           </div>
           {allocationsLoading ? (
             <Loading />
-          ) : !allocations || allocations.length === 0 ? (
+          ) : allocationRows.length === 0 ? (
             <EmptyState icon="hostel" title="No allocations found" actionLabel="Add allocation" onAction={openCreateAllocation} />
           ) : (
-            <Table columns={allocationColumns} rows={allocations} />
+            <>
+              <Table columns={allocationColumns} rows={allocationRows} />
+              <Pagination page={allocationPage} totalPages={allocationPagination.totalPages} count={allocationPagination.count} limit={allocationPagination.limit} onPageChange={setAllocationPage} />
+            </>
           )}
         </div>
       )}

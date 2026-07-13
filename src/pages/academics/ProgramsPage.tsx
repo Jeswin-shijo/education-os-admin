@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Program } from '../../data/types';
 import {
@@ -15,6 +16,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const NAVY = '#13327F';
@@ -28,7 +30,7 @@ const emptyForm = {
 };
 
 export function ProgramsPage() {
-  const { data: rows, loading, reload } = useAsync(() => adminService.programs.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.programs.listPage(p), []);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -161,10 +163,13 @@ export function ProgramsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No programs found" actionLabel="Add program" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit program' : 'Add program'}>

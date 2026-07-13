@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as materialService from '../../services/materialService';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Material, MaterialKind } from '../../data/types';
 import { formatRelative } from '../../lib';
@@ -18,6 +19,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const ALL_SUBJECTS = '__all__';
@@ -41,8 +43,8 @@ const emptyForm = {
 export function MaterialsPage() {
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
   const [filterSubjectId, setFilterSubjectId] = useState(ALL_SUBJECTS);
-  const { data: rows, loading, reload } = useAsync(
-    () => materialService.list(filterSubjectId === ALL_SUBJECTS ? undefined : filterSubjectId),
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList(
+    (p) => materialService.listPage(filterSubjectId === ALL_SUBJECTS ? undefined : filterSubjectId, p),
     [filterSubjectId],
   );
 
@@ -162,10 +164,13 @@ export function MaterialsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="subject" title="No materials found" actionLabel="Upload material" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Upload material">

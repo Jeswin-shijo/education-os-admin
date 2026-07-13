@@ -1,6 +1,6 @@
 import * as db from './db';
 import * as authService from './authService';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import { CORE_SUBJECT_IDS, CORE_USER_IDS, hodCandidates as seedHodCandidates, students as seedStudents } from '../data/seed';
 import type {
@@ -73,6 +73,23 @@ function matches(haystacks: (string | number | undefined)[], q: string): boolean
   const needle = q.trim().toLowerCase();
   if (!needle) return true;
   return haystacks.some((h) => h !== undefined && String(h).toLowerCase().includes(needle));
+}
+
+/** Page size for admin list tables — mirrors the backend's StandardPagination. */
+export const PAGE_SIZE = 25;
+
+/** Slice an in-memory array into a `Paginated<T>` page (used by the mock arms).
+ *  Exported so the sibling domain services (exam/assignment/material/quiz/certificate)
+ *  can reuse the exact same local-paging helper. */
+export function paginateLocal<T>(rows: T[], page: number): Paginated<T> {
+  const count = rows.length;
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const p = Math.min(Math.max(1, page), totalPages);
+  const start = (p - 1) * PAGE_SIZE;
+  return {
+    results: rows.slice(start, start + PAGE_SIZE),
+    pagination: { count, page: p, limit: PAGE_SIZE, totalPages },
+  };
 }
 
 export async function getDashboard(): Promise<AdminDashboard> {
@@ -164,6 +181,7 @@ type StudentApi = {
   mentor_name?: string;
   avatar_color?: string;
   profile_pic?: string | null;
+  address?: string;
 };
 function mapStudentFromApi(s: StudentApi): Student {
   const semNum = Number(s.semester_number ?? 0);
@@ -186,6 +204,7 @@ function mapStudentFromApi(s: StudentApi): Student {
     bloodGroup: s.blood_group ?? '',
     gender: GENDER_FROM_API[(s.gender ?? '').toLowerCase()] ?? 'Male',
     dob: s.dob ?? '',
+    address: s.address ?? '',
   };
 }
 
@@ -205,6 +224,7 @@ function studentToApiFields(input: Omit<Student, 'id'>): Record<string, string> 
     dob: input.dob,
     blood_group: input.bloodGroup,
     mentor_name: input.mentorName,
+    address: input.address ?? '',
   };
 }
 
@@ -224,6 +244,20 @@ export const students = {
         const rows = await http.get<StudentApi[]>('/api/v1/students/');
         const mapped = rows.map(mapStudentFromApi);
         return q ? mapped.filter((s) => matches([s.name, s.rollNo, s.email], q)) : mapped;
+      },
+    );
+  },
+  /** Server-paginated + searched list for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<Student>> {
+    return fromSource(
+      async () => {
+        const all = await db.read('students');
+        const filtered = q ? all.filter((s) => matches([s.name, s.rollNo, s.email], q)) : all;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<StudentApi>('/api/v1/students/', { search: q, page, limit: PAGE_SIZE });
+        return { results: res.results.map(mapStudentFromApi), pagination: res.pagination };
       },
     );
   },
@@ -340,6 +374,20 @@ export const faculty = {
       },
     );
   },
+  /** Server-paginated + searched list for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<FacultyMember>> {
+    return fromSource(
+      async () => {
+        const all = await db.read('faculty');
+        const filtered = q ? all.filter((f) => matches([f.name, f.email, f.department], q)) : all;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<FacultyApi>('/api/v1/faculty', { search: q, page, limit: PAGE_SIZE });
+        return { results: res.results.map(mapFacultyFromApi), pagination: res.pagination };
+      },
+    );
+  },
   async create(input: Omit<FacultyMember, 'id'> & { password?: string }): Promise<FacultyMember> {
     return fromSource(
       async () => {
@@ -402,6 +450,8 @@ export const faculty = {
         if (patch.designation !== undefined) fields.designation = patch.designation;
         if (patch.qualifications !== undefined) fields.qualifications = patch.qualifications ?? '';
         if (patch.experience !== undefined) fields.experience = patch.experience ?? '';
+        // `department` accepts an id/code/name; the service resolves it to the FK.
+        if (patch.department !== undefined) fields.department = patch.department;
         const isUpload = typeof patch.photoUrl === 'string' && patch.photoUrl.startsWith('data:');
         if (isUpload) {
           const form = new FormData();
@@ -539,6 +589,32 @@ export const users = {
       },
     );
   },
+  /** Server-paginated + searched/role-filtered list for the table (25/page). */
+  async listPage(q: string, role: Role | undefined, page: number): Promise<Paginated<PlatformUser>> {
+    return fromSource(
+      async () => {
+        let rows = await db.read('platformUsers');
+        if (role) rows = rows.filter((u) => u.role === role);
+        const filtered = q ? rows.filter((u) => matches([u.name, u.email], q)) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<{ id: string; name: string; email: string; role: string; is_active?: boolean }>(
+          '/api/v1/admin/users',
+          { search: q, role, page, limit: PAGE_SIZE },
+        );
+        const rows: PlatformUser[] = res.results.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role as Role,
+          active: u.is_active ?? true,
+          avatarColor: '#13327F',
+        }));
+        return { results: rows, pagination: res.pagination };
+      },
+    );
+  },
   async updateRole(id: string, role: Role): Promise<PlatformUser> {
     return fromSource(
       async () => {
@@ -598,6 +674,16 @@ export const departments = {
       async () => {
         const rows = await http.get<{ id: string; code: string; name: string; hod?: string }[]>('/api/v1/departments/');
         return rows.map((d) => ({ id: d.id, code: d.code, name: d.name, hod: d.hod }));
+      },
+    );
+  },
+  /** Server-paginated list for the table (25/page). */
+  async listPage(page: number): Promise<Paginated<Department>> {
+    return fromSource(
+      async () => paginateLocal(await db.read('departments'), page),
+      async () => {
+        const res = await http.getPaginated<{ id: string; code: string; name: string; hod?: string }>('/api/v1/departments/', { page, limit: PAGE_SIZE });
+        return { results: res.results.map((d) => ({ id: d.id, code: d.code, name: d.name, hod: d.hod })), pagination: res.pagination };
       },
     );
   },
@@ -673,6 +759,22 @@ export const programs = {
           '/api/v1/programs/',
         );
         return rows.map((p) => ({ id: p.id, code: p.code, name: p.name, departmentId: p.department, durationYears: p.duration_years, intake: p.intake, color: '#13327F' }));
+      },
+    );
+  },
+  /** Server-paginated list for the table (25/page). */
+  async listPage(page: number): Promise<Paginated<Program>> {
+    return fromSource(
+      async () => paginateLocal(await db.read('programs'), page),
+      async () => {
+        const res = await http.getPaginated<{ id: string; code: string; name: string; department: string; duration_years: number; intake: number }>(
+          '/api/v1/programs/',
+          { page, limit: PAGE_SIZE },
+        );
+        return {
+          results: res.results.map((p) => ({ id: p.id, code: p.code, name: p.name, departmentId: p.department, durationYears: p.duration_years, intake: p.intake, color: '#13327F' })),
+          pagination: res.pagination,
+        };
       },
     );
   },
@@ -757,6 +859,20 @@ export const semesters = {
       },
     );
   },
+  /** Server-paginated list (optionally scoped by program) for the table (25/page). */
+  async listPage(programId: string | undefined, page: number): Promise<Paginated<Semester>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('semesters');
+        const filtered = programId ? rows.filter((s) => s.programId === programId) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<{ id: string; program: string; number: number }>('/api/v1/semesters/', { program: programId, page, limit: PAGE_SIZE });
+        return { results: res.results.map((s) => ({ id: s.id, programId: s.program, number: s.number })), pagination: res.pagination };
+      },
+    );
+  },
   async create(input: Omit<Semester, 'id'>): Promise<Semester> {
     return fromSource(
       async () => {
@@ -804,6 +920,20 @@ export const sections = {
         const path = semesterIdFilter ? `/api/v1/sections/?semester=${semesterIdFilter}` : '/api/v1/sections/';
         const rows = await http.get<{ id: string; semester: string; name: string; shift?: Shift }[]>(path);
         return rows.map((s) => ({ id: s.id, semesterId: s.semester, name: s.name, shift: s.shift }));
+      },
+    );
+  },
+  /** Server-paginated list (optionally scoped by semester) for the table (25/page). */
+  async listPage(semesterIdFilter: string | undefined, page: number): Promise<Paginated<Section>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('sections');
+        const filtered = semesterIdFilter ? rows.filter((s) => s.semesterId === semesterIdFilter) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<{ id: string; semester: string; name: string; shift?: Shift }>('/api/v1/sections/', { semester: semesterIdFilter, page, limit: PAGE_SIZE });
+        return { results: res.results.map((s) => ({ id: s.id, semesterId: s.semester, name: s.name, shift: s.shift })), pagination: res.pagination };
       },
     );
   },
@@ -889,6 +1019,20 @@ export const subjects = {
         const rows = await http.get<RawSubject[]>('/api/v1/subjects/');
         const mapped = rows.map(mapSubject);
         return q ? mapped.filter((s) => matches([s.name, s.code, s.facultyName, ...(s.facultyNames ?? [])], q)) : mapped;
+      },
+    );
+  },
+  /** Server-paginated + searched list for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<Subject>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('subjects');
+        const filtered = q ? rows.filter((s) => matches([s.name, s.code, s.facultyName], q)) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<RawSubject>('/api/v1/subjects/', { search: q, page, limit: PAGE_SIZE });
+        return { results: res.results.map(mapSubject), pagination: res.pagination };
       },
     );
   },
@@ -1015,6 +1159,25 @@ export const timetable = {
         const week = await http.get<unknown>(path);
         const rows: unknown[] = Array.isArray(week) ? week : Object.values(week as Record<string, unknown[]>).flat();
         return (rows as Record<string, unknown>[]).map(mapClassSession);
+      },
+    );
+  },
+  // Paged week for the table. `/timetable/week` returns the whole week (a grouped
+  // object, not a paginated list), so the real arm flattens+maps it exactly like
+  // list() does and pages the result locally.
+  async listPage(facultyId: string | undefined, page: number): Promise<Paginated<ClassSession>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('sessions');
+        const filtered = facultyId ? rows.filter((s) => s.facultyId === facultyId) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const path = facultyId ? `/api/v1/timetable/week?faculty=${encodeURIComponent(facultyId)}` : '/api/v1/timetable/week';
+        const week = await http.get<unknown>(path);
+        const raw: unknown[] = Array.isArray(week) ? week : Object.values(week as Record<string, unknown[]>).flat();
+        const mapped = (raw as Record<string, unknown>[]).map(mapClassSession);
+        return paginateLocal(mapped, page);
       },
     );
   },
@@ -1289,6 +1452,31 @@ export const fees = {
       },
     );
   },
+  /** Server-paginated + searched list for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<FeeInvoice>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('fees');
+        const filtered = q ? rows.filter((f) => matches([f.studentName, f.title, f.term], q)) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<Record<string, unknown>>('/api/v1/fees/', { search: q, page, limit: PAGE_SIZE });
+        const mapped: FeeInvoice[] = res.results.map((f) => ({
+          id: f.id as string,
+          studentId: f.student as string,
+          studentName: (f.student_name as string) ?? '',
+          title: f.title as string,
+          term: f.term as string,
+          amount: f.amount as number,
+          dueDate: (f.dueDate as string) ?? (f.due_date as string),
+          status: f.status as FeeInvoice['status'],
+          paidOn: f.paidOn as string | undefined,
+        }));
+        return { results: mapped, pagination: res.pagination };
+      },
+    );
+  },
   async create(input: Omit<FeeInvoice, 'id' | 'status'>): Promise<FeeInvoice> {
     return fromSource(
       async () => {
@@ -1413,6 +1601,29 @@ export const library = {
       },
     );
   },
+  /** Server-paginated + searched book catalogue for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<Book>> {
+    return fromSource(
+      async () => {
+        const rows = await db.read('books');
+        const filtered = q ? rows.filter((b) => matches([b.title, b.author, b.category], q)) : rows;
+        return paginateLocal(filtered, page);
+      },
+      async () => {
+        const res = await http.getPaginated<Record<string, unknown>>('/api/v1/library/books-admin/', { search: q, page, limit: PAGE_SIZE });
+        const mapped: Book[] = res.results.map((b) => ({
+          id: b.id as string,
+          title: b.title as string,
+          author: b.author as string,
+          category: b.category as string,
+          isbn: b.isbn as string | undefined,
+          copies: b.copies_total as number,
+          available: b.copies_available as number,
+        }));
+        return { results: mapped, pagination: res.pagination };
+      },
+    );
+  },
   async create(input: Omit<Book, 'id'>): Promise<Book> {
     return fromSource(
       async () => {
@@ -1495,6 +1706,27 @@ export const library = {
             // Backend uses 'borrowed'; the console's vocabulary is 'active'.
             status: (l.status === 'borrowed' ? 'active' : l.status) as BookLoan['status'],
           }));
+        },
+      );
+    },
+    /** Server-paginated loans list for the table (25/page). */
+    async listPage(page: number): Promise<Paginated<BookLoan>> {
+      return fromSource(
+        async () => paginateLocal(await db.read('bookLoans'), page),
+        async () => {
+          const res = await http.getPaginated<Record<string, unknown>>('/api/v1/library/loans-admin/', { page, limit: PAGE_SIZE });
+          const mapped: BookLoan[] = res.results.map((l) => ({
+            id: l.id as string,
+            bookId: l.book as string,
+            bookTitle: (l.book_title as string) ?? '',
+            studentId: l.student as string,
+            studentName: (l.student_name as string) ?? '',
+            issuedOn: l.issued_on as string,
+            dueOn: l.due_on as string,
+            returnedOn: (l.returned_on as string | null) ?? undefined,
+            status: (l.status === 'borrowed' ? 'active' : l.status) as BookLoan['status'],
+          }));
+          return { results: mapped, pagination: res.pagination };
         },
       );
     },
@@ -1683,6 +1915,19 @@ export const hostel = {
         },
       );
     },
+    /** Server-paginated blocks list for the table (25/page). */
+    async listPage(page: number): Promise<Paginated<HostelBlock>> {
+      return fromSource(
+        async () => paginateLocal(await db.read('hostelBlocks'), page),
+        async () => {
+          const res = await http.getPaginated<Record<string, unknown>>('/api/v1/hostel-blocks/', { page, limit: PAGE_SIZE });
+          return {
+            results: res.results.map((b) => ({ id: b.id as string, name: b.name as string, warden: b.warden as string, wardenPhone: b.warden_phone as string })),
+            pagination: res.pagination,
+          };
+        },
+      );
+    },
     async create(input: Omit<HostelBlock, 'id'>): Promise<HostelBlock> {
       return fromSource(
         async () => {
@@ -1728,6 +1973,23 @@ export const hostel = {
         },
       );
     },
+    /** Server-paginated rooms list (optionally scoped by block) for the table (25/page). */
+    async listPage(blockId: string | undefined, page: number): Promise<Paginated<HostelRoom>> {
+      return fromSource(
+        async () => {
+          const rows = await db.read('hostelRooms');
+          const filtered = blockId ? rows.filter((r) => r.blockId === blockId) : rows;
+          return paginateLocal(filtered, page);
+        },
+        async () => {
+          const res = await http.getPaginated<Record<string, unknown>>('/api/v1/hostel-rooms/', { block: blockId, page, limit: PAGE_SIZE });
+          return {
+            results: res.results.map((r) => ({ id: r.id as string, blockId: r.block as string, roomNo: r.room_no as string, capacity: r.capacity as number })),
+            pagination: res.pagination,
+          };
+        },
+      );
+    },
     async create(input: Omit<HostelRoom, 'id'>): Promise<HostelRoom> {
       return fromSource(
         async () => {
@@ -1752,6 +2014,19 @@ export const hostel = {
         async () => {
           const rows = await http.get<Record<string, unknown>[]>('/api/v1/hostel/');
           return rows.map((a) => ({ id: a.id as string, studentId: a.student as string, studentName: (a.student_name as string) ?? '', roomId: a.room as string, bed: a.bed as string, messPlan: a.mess_plan as string, fees: a.fees as number }));
+        },
+      );
+    },
+    /** Server-paginated allocations list for the table (25/page). */
+    async listPage(page: number): Promise<Paginated<HostelAllocation>> {
+      return fromSource(
+        async () => paginateLocal(await db.read('hostelAllocations'), page),
+        async () => {
+          const res = await http.getPaginated<Record<string, unknown>>('/api/v1/hostel/', { page, limit: PAGE_SIZE });
+          return {
+            results: res.results.map((a) => ({ id: a.id as string, studentId: a.student as string, studentName: (a.student_name as string) ?? '', roomId: a.room as string, bed: a.bed as string, messPlan: a.mess_plan as string, fees: a.fees as number })),
+            pagination: res.pagination,
+          };
         },
       );
     },
@@ -1810,6 +2085,26 @@ export const notifications = {
       },
     );
   },
+  /** Server-paginated sent-notifications list for the table (25/page). */
+  async listPage(page: number): Promise<Paginated<NotificationItem>> {
+    return fromSource(
+      async () => paginateLocal(await db.read('notifications'), page),
+      async () => {
+        const res = await http.getPaginated<Record<string, unknown>>('/api/v1/notifications/', { page, limit: PAGE_SIZE });
+        const mapped: NotificationItem[] = res.results.map((n) => ({
+          id: n.id as string,
+          recipientId: n.recipient as string | undefined,
+          broadcastRole: (n.broadcast_role as string) as NotificationItem['broadcastRole'],
+          title: n.title as string,
+          body: n.body as string,
+          category: n.category as NotificationItem['category'],
+          read: (n.read as boolean) ?? (n.is_read as boolean) ?? false,
+          sentAt: n.created_at as string,
+        }));
+        return { results: mapped, pagination: res.pagination };
+      },
+    );
+  },
   recipientCandidates(): Promise<{ id: string; name: string; email: string; role: string }[]> {
     return fromSource(
       async () => {
@@ -1859,6 +2154,12 @@ export const notifications = {
 // =====================================================================================
 export const audit = {
   list: (): Promise<AuditLog[]> => db.read('auditLogs'),
+  /** Local-only paginated + searched log list for the table (25/page). */
+  async listPage(q: string, page: number): Promise<Paginated<AuditLog>> {
+    const rows = await db.read('auditLogs');
+    const filtered = q ? rows.filter((l) => matches([l.actor, l.entity, l.detail, l.action], q)) : rows;
+    return paginateLocal(filtered, page);
+  },
   async log(entry: { action: AuditLog['action']; entity: string; detail: string }): Promise<void> {
     await logAction(entry.action, entry.entity, entry.detail);
   },

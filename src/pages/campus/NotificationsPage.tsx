@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { NotificationItem, Role } from '../../data/types';
 import { formatRelative } from '../../lib';
@@ -18,6 +19,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 type Mode = 'direct' | 'broadcast';
@@ -58,7 +60,7 @@ const emptyForm = {
 };
 
 export function NotificationsPage() {
-  const { data: rows, loading, reload } = useAsync(() => adminService.notifications.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.notifications.listPage(p), []);
   const { data: recipients } = useAsync(() => adminService.notifications.recipientCandidates(), []);
 
   const [mode, setMode] = useState<Mode>('direct');
@@ -195,10 +197,13 @@ export function NotificationsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="notification" title="No notifications sent yet" />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

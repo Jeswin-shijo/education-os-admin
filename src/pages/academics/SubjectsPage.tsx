@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { CORE_SUBJECT_IDS } from '../../data/seed';
 import type { Subject } from '../../data/types';
@@ -19,6 +20,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const NAVY = '#13327F';
@@ -36,7 +38,7 @@ const emptyForm = {
 
 export function SubjectsPage() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.subjects.list(q), [q]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.subjects.listPage(q, p), [q]);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
   const { data: allPrograms } = useAsync(() => adminService.programs.list(), []);
   const { data: facultyCandidates } = useAsync(() => adminService.subjects.facultyCandidates(), []);
@@ -256,10 +258,13 @@ export function SubjectsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No subjects found" actionLabel="Add subject" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit subject' : 'Add subject'} width={560}>

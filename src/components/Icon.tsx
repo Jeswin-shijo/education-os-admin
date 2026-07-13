@@ -38,7 +38,9 @@ type IconName =
   | 'event'
   | 'complaint'
   | 'leave'
-  | 'certificate';
+  | 'certificate'
+  | 'eye'
+  | 'eye-off';
 
 const paths: Record<IconName, string> = {
   search: 'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
@@ -85,6 +87,8 @@ const paths: Record<IconName, string> = {
   complaint: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2zM12 8v3M12 14h.01',
   leave: 'M8 2v3M16 2v3M3 9h18M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM9 15l2 2 4-4',
   certificate: 'M12 15a5 5 0 100-10 5 5 0 000 10zM8.5 13.5L7 21l5-2 5 2-1.5-7.5',
+  eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 15a3 3 0 100-6 3 3 0 000 6z',
+  'eye-off': 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22',
 };
 
 export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {

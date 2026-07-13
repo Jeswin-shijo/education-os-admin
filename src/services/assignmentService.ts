@@ -1,8 +1,35 @@
 import * as db from './db';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
+import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { Assignment, AuditLog } from '../data/types';
+
+type AssignmentApi = {
+  id: string;
+  subject: string;
+  subject_code?: string;
+  subject_name?: string;
+  title: string;
+  description: string;
+  due_date: string;
+  max_marks: number;
+  status: Assignment['status'];
+};
+
+function mapAssignment(a: AssignmentApi): Assignment {
+  return {
+    id: a.id,
+    subjectId: a.subject,
+    subjectCode: a.subject_code,
+    subjectName: a.subject_name,
+    title: a.title,
+    description: a.description,
+    dueDate: a.due_date,
+    maxMarks: a.max_marks,
+    status: a.status,
+  };
+}
 
 function genId(prefix: string) { return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`; }
 async function logAction(action: AuditLog['action'], entity: string, detail: string) {
@@ -32,6 +59,17 @@ export async function list(): Promise<Assignment[]> {
         maxMarks: a.max_marks,
         status: a.status,
       }));
+    },
+  );
+}
+
+/** Server-paginated list for the table (25/page). */
+export async function listPage(page: number): Promise<Paginated<Assignment>> {
+  return fromSource(
+    async () => paginateLocal(await db.read('assignments'), page),
+    async () => {
+      const res = await http.getPaginated<AssignmentApi>('/api/v1/assignments/', { page, limit: PAGE_SIZE });
+      return { results: res.results.map(mapAssignment), pagination: res.pagination };
     },
   );
 }

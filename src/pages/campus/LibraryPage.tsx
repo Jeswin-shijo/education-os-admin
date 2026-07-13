@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { toLocalISODate } from '../../lib/date';
 import type { Book, BookLoan } from '../../data/types';
@@ -20,6 +21,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const emptyForm = {
@@ -32,7 +34,7 @@ const emptyForm = {
 
 function BooksTab() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.library.list(q), [q]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.library.listPage(q, p), [q]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Book | null>(null);
@@ -157,10 +159,13 @@ function BooksTab() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No books found" actionLabel="Add book" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit book' : 'Add book'}>
@@ -203,7 +208,7 @@ function loanStatusPill(loan: BookLoan) {
 }
 
 function LoansTab() {
-  const { data: loans, loading, reload } = useAsync(() => adminService.library.loans.list(), []);
+  const { rows: loans, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.library.loans.listPage(p), []);
   const { data: books } = useAsync(() => adminService.library.list(), []);
   const { data: students } = useAsync(() => adminService.students.list(), []);
 
@@ -328,10 +333,13 @@ function LoansTab() {
 
       {loading ? (
         <Loading />
-      ) : !loans || loans.length === 0 ? (
+      ) : loans.length === 0 ? (
         <EmptyState icon="academics" title="No loans yet" actionLabel="Issue book" onAction={openIssue} />
       ) : (
-        <Table columns={columns} rows={loans} />
+        <>
+          <Table columns={columns} rows={loans} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Issue book">

@@ -1,8 +1,23 @@
 import * as db from './db';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
+import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { AuditLog, Material } from '../data/types';
+
+type MaterialApi = { id: string; subjectId: string; title: string; kind: Material['kind']; sizeLabel?: string; url?: string; addedAt: string };
+
+function mapMaterial(m: MaterialApi): Material {
+  return {
+    id: m.id,
+    subjectId: m.subjectId,
+    title: m.title,
+    kind: m.kind,
+    sizeLabel: m.sizeLabel,
+    url: m.url ?? '',
+    addedAt: m.addedAt,
+  };
+}
 
 function genId(prefix: string) { return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`; }
 async function logAction(action: AuditLog['action'], entity: string, detail: string) {
@@ -35,6 +50,21 @@ export async function list(subjectId?: string): Promise<Material[]> {
         url: m.url ?? '',
         addedAt: m.addedAt,
       }));
+    },
+  );
+}
+
+/** Server-paginated list (optionally scoped by subject) for the table (25/page). */
+export async function listPage(subjectId: string | undefined, page: number): Promise<Paginated<Material>> {
+  return fromSource(
+    async () => {
+      const rows = await db.read('materials');
+      const filtered = subjectId ? rows.filter((m) => m.subjectId === subjectId) : rows;
+      return paginateLocal(filtered, page);
+    },
+    async () => {
+      const res = await http.getPaginated<MaterialApi>('/api/v1/materials/', { subjectId, page, limit: PAGE_SIZE });
+      return { results: res.results.map(mapMaterial), pagination: res.pagination };
     },
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
-import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import type { PlatformUser, Role } from '../../data/types';
 import {
   PageHeader,
@@ -14,6 +14,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 // 'parent' is intentionally omitted — parents can no longer log in to the platform.
@@ -26,11 +27,10 @@ const roleFilterOptions = [{ label: 'All roles', value: '' }, ...roleOptions];
 export function UsersRolesPage() {
   const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | ''>('');
-  const {
-    data: rows,
-    loading,
-    reload,
-  } = useAsync(() => adminService.users.list(q, roleFilter || undefined), [q, roleFilter]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList(
+    (p) => adminService.users.listPage(q, roleFilter || undefined, p),
+    [q, roleFilter],
+  );
 
   const [actionError, setActionError] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
@@ -133,10 +133,13 @@ export function UsersRolesPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="people" title="No users found" />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

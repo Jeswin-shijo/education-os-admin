@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as certificateService from '../../services/certificateService';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Certificate } from '../../data/types';
 import { formatDate } from '../../lib';
@@ -19,6 +20,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const KINDS: Certificate['kind'][] = ['course', 'event', 'achievement'];
@@ -41,7 +43,7 @@ const emptyForm = {
 };
 
 export function CertificatesPage() {
-  const { data: rows, loading, reload } = useAsync(() => certificateService.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => certificateService.listPage(p), []);
   const { data: students } = useAsync(() => adminService.students.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -125,10 +127,13 @@ export function CertificatesPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No certificates found" actionLabel="Issue certificate" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Issue certificate" width={520}>

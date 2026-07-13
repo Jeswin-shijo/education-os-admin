@@ -31,6 +31,7 @@ export type Student = {
   bloodGroup: string;
   gender: Gender;
   dob: string;
+  address?: string;
 };
 
 export type Shift = 'Morning' | 'Afternoon' | 'Evening';

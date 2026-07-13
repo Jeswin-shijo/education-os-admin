@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as quizService from '../../services/quizService';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Quiz, QuizQuestion } from '../../data/types';
 import {
@@ -17,6 +18,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 type DraftQuestion = Omit<QuizQuestion, 'id'>;
@@ -41,7 +43,7 @@ function isComplete(row: DraftQuestion): boolean {
 }
 
 export function QuizzesPage() {
-  const { data: rows, loading, reload } = useAsync(() => quizService.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => quizService.listPage(p), []);
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -176,10 +178,13 @@ export function QuizzesPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="subject" title="No quizzes found" actionLabel="Create quiz" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create quiz" width={640}>

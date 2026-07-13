@@ -1,7 +1,8 @@
 import * as db from './db';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
+import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { AuditLog, Quiz, QuizQuestion } from '../data/types';
 
 function genId(prefix: string) { return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`; }
@@ -22,6 +23,20 @@ export async function list(): Promise<Quiz[]> {
     async () => {
       const rows = await http.get<{ id: string; subjectId: string; title: string; questions: QuizQuestion[] }[]>('/api/v1/quizzes/');
       return rows.map((q) => ({ id: q.id, subjectId: q.subjectId, title: q.title, questions: q.questions }));
+    },
+  );
+}
+
+/** Server-paginated list for the table (25/page). */
+export async function listPage(page: number): Promise<Paginated<Quiz>> {
+  return fromSource(
+    async () => paginateLocal(await db.read('quizzes'), page),
+    async () => {
+      const res = await http.getPaginated<{ id: string; subjectId: string; title: string; questions: QuizQuestion[] }>('/api/v1/quizzes/', { page, limit: PAGE_SIZE });
+      return {
+        results: res.results.map((q) => ({ id: q.id, subjectId: q.subjectId, title: q.title, questions: q.questions })),
+        pagination: res.pagination,
+      };
     },
   );
 }

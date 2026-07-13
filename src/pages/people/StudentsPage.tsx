@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Section, Semester, Student } from '../../data/types';
 import { isEmail } from '../../lib/validation';
 import { toLocalISODate } from '../../lib/date';
+import { cn } from '../../lib/cn';
 import {
   PageHeader,
   Button,
@@ -20,6 +22,8 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Icon,
+  Pagination,
 } from '../../components';
 
 const NAVY = '#13327F';
@@ -45,12 +49,22 @@ const emptyForm = {
   gender: GENDER_OPTIONS[0],
   dob: '',
   password: '',
+  address: '',
   avatarUrl: '',
 };
 
+/** Auto-generate a password as `Name@BirthYear` (e.g. Ashika@2000) from the
+ *  student's first name and DOB. Empty until both are known. */
+function generatePassword(name: string, dob: string): string {
+  const first = name.trim().split(/\s+/)[0] ?? '';
+  const year = dob ? dob.slice(0, 4) : '';
+  if (!first || !year) return '';
+  return `${first.charAt(0).toUpperCase()}${first.slice(1)}@${year}`;
+}
+
 export function StudentsPage() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.students.list(q), [q]);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.students.listPage(q, p), [q]);
   const { data: departments } = useAsync(() => adminService.departments.list(), []);
   const { data: allPrograms } = useAsync(() => adminService.programs.list(), []);
 
@@ -62,12 +76,24 @@ export function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [photoError, setPhotoError] = useState<string>();
+  const [showPassword, setShowPassword] = useState(false);
+  // Once the admin types their own password, stop auto-filling it from name/DOB.
+  const [passwordManual, setPasswordManual] = useState(false);
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
     clearError(key as string);
   }
+
+  // Keep the password in sync with name/DOB (as `Name@BirthYear`) while creating,
+  // until the admin edits it by hand.
+  useEffect(() => {
+    if (editing || passwordManual) return;
+    const gen = generatePassword(form.name, form.dob);
+    if (!gen) return;
+    setForm((f) => (f.password === gen ? f : { ...f, password: gen }));
+  }, [form.name, form.dob, editing, passwordManual]);
 
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [deleteError, setDeleteError] = useState<string>();
@@ -99,6 +125,8 @@ export function StudentsPage() {
     setForm({ ...emptyForm, departmentId: firstDept, programId: firstProgram, semesterId: firstSemester, sectionId: secs[0]?.id ?? '' });
     setFormError(undefined);
     setPhotoError(undefined);
+    setShowPassword(false);
+    setPasswordManual(false);
     resetErrors();
     setModalOpen(true);
   }
@@ -124,10 +152,13 @@ export function StudentsPage() {
       gender: s.gender,
       dob: s.dob,
       password: '',
+      address: s.address ?? '',
       avatarUrl: s.avatarUrl ?? '',
     });
     setFormError(undefined);
     setPhotoError(undefined);
+    setShowPassword(false);
+    setPasswordManual(false);
     resetErrors();
     setModalOpen(true);
   }
@@ -208,6 +239,7 @@ export function StudentsPage() {
         bloodGroup: form.bloodGroup,
         gender: form.gender,
         dob: form.dob,
+        address: form.address,
       };
       if (editing) {
         await adminService.students.update(editing.id, payload);
@@ -290,10 +322,13 @@ export function StudentsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="people" title="No students found" actionLabel="Add student" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit student' : 'Add student'} width={560}>
@@ -320,18 +355,6 @@ export function StudentsPage() {
             <TextField label="Admission no." value={form.admissionNo} onChangeText={(v) => setForm((f) => ({ ...f, admissionNo: v }))} />
             <TextField label="Email" type="email" autoComplete="off" required error={errors.email} value={form.email} onChangeText={(v) => setField('email', v)} />
             <TextField label="Phone" autoComplete="off" value={form.phone} onChangeText={(v) => setForm((f) => ({ ...f, phone: v }))} />
-            {!editing && (
-              <TextField
-                label="Password"
-                type="password"
-                autoComplete="new-password"
-                required
-                error={errors.password}
-                value={form.password}
-                onChangeText={(v) => setField('password', v)}
-                placeholder="Min. 8 characters"
-              />
-            )}
             <Select
               label="Gender"
               value={form.gender}
@@ -344,6 +367,54 @@ export function StudentsPage() {
               onChange={(v) => setForm((f) => ({ ...f, dob: v }))}
               maxDate={toLocalISODate(new Date())}
             />
+            {!editing && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-label uppercase tracking-wide text-ink-muted">
+                    Password<span className="text-danger"> *</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!generatePassword(form.name, form.dob)}
+                    onClick={() => {
+                      setForm((f) => ({ ...f, password: generatePassword(f.name, f.dob) }));
+                      setPasswordManual(false);
+                      clearError('password');
+                    }}
+                    title="Generate as Name@BirthYear"
+                    className="text-caption font-semibold text-navy hover:underline disabled:opacity-40 disabled:no-underline"
+                  >
+                    Auto-generate
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={form.password}
+                    onChange={(e) => {
+                      setField('password', e.target.value);
+                      setPasswordManual(true);
+                    }}
+                    placeholder="Name@BirthYear"
+                    className={cn(
+                      'w-full rounded-md border bg-surface px-3 py-2.5 pr-10 text-body text-ink outline-none transition-colors',
+                      'focus:border-navy focus:ring-2 focus:ring-navy-soft',
+                      errors.password ? 'border-danger' : 'border-line',
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft transition-colors hover:text-ink"
+                  >
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={16} />
+                  </button>
+                </div>
+                {errors.password && <span className="text-caption text-danger">{errors.password}</span>}
+              </div>
+            )}
             <Select
               label="Department"
               required
@@ -386,6 +457,16 @@ export function StudentsPage() {
             />
           </div>
           <TextField label="Mentor" value={form.mentorName} onChangeText={(v) => setForm((f) => ({ ...f, mentorName: v }))} />
+          <label className="flex flex-col gap-1.5">
+            <span className="text-label uppercase tracking-wide text-ink-muted">Address</span>
+            <textarea
+              rows={2}
+              value={form.address}
+              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              placeholder="House / street, city, state, PIN"
+              className="resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-body text-ink outline-none transition-colors focus:border-navy focus:ring-2 focus:ring-navy-soft"
+            />
+          </label>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label={editing ? 'Save changes' : 'Add student'} size="sm" loading={saving} onClick={handleSave} />

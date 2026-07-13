@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as assignmentService from '../../services/assignmentService';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Assignment, AssignmentStatus } from '../../data/types';
 import { formatDate } from '../../lib';
@@ -19,6 +20,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const statusTone: Record<AssignmentStatus, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
@@ -37,7 +39,7 @@ const emptyForm = {
 };
 
 export function AssignmentsPage() {
-  const { data: rows, loading, reload } = useAsync(() => assignmentService.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => assignmentService.listPage(p), []);
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -155,10 +157,13 @@ export function AssignmentsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No assignments found" actionLabel="Add assignment" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add assignment">

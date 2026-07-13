@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import * as examService from '../../services/examService';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { ExamResult } from '../../data/types';
 import {
@@ -17,6 +18,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 type GradeStatus = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -42,7 +44,7 @@ const emptyForm = {
 };
 
 export function ResultsPage() {
-  const { data: rows, loading, reload } = useAsync(() => examService.results.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => examService.results.listPage(p), []);
   const { data: students } = useAsync(() => adminService.students.list(), []);
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
 
@@ -183,10 +185,13 @@ export function ResultsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="audit" title="No results found" actionLabel="Add result" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit result' : 'Add result'}>

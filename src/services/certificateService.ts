@@ -1,7 +1,8 @@
 import * as db from './db';
-import { http } from './http';
+import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
+import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { AuditLog, Certificate } from '../data/types';
 
 function genId(prefix: string) {
@@ -45,6 +46,17 @@ export async function list(): Promise<Certificate[]> {
       // admin CRUD resource.
       const rows = await http.get<CertificateApi[]>('/api/v1/certificates-admin');
       return rows.map(mapCertificate);
+    },
+  );
+}
+
+/** Server-paginated list for the table (25/page). */
+export async function listPage(page: number): Promise<Paginated<Certificate>> {
+  return fromSource(
+    async () => paginateLocal(await db.read('certificates'), page),
+    async () => {
+      const res = await http.getPaginated<CertificateApi>('/api/v1/certificates-admin', { page, limit: PAGE_SIZE });
+      return { results: res.results.map(mapCertificate), pagination: res.pagination };
     },
   );
 }

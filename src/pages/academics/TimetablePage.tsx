@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import { groupBy, keyBy } from '../../lib';
 import type { ClassSession, Weekday, Shift, SessionStatus } from '../../data/types';
@@ -16,6 +17,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 const WEEKDAYS: Weekday[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -73,8 +75,8 @@ const emptyForm = {
 
 export function TimetablePage() {
   const [facultyFilter, setFacultyFilter] = useState('');
-  const { data: rows, loading, reload } = useAsync(
-    () => adminService.timetable.list(facultyFilter || undefined),
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList(
+    (p) => adminService.timetable.listPage(facultyFilter || undefined, p),
     [facultyFilter],
   );
   const { data: subjects } = useAsync(() => adminService.subjects.list(), []);
@@ -279,9 +281,10 @@ export function TimetablePage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No sessions found" actionLabel="Add session" onAction={openCreate} />
       ) : (
+        <>
         <div className="flex flex-col gap-4">
           {WEEKDAYS.filter((day) => grouped[day]?.length).map((day) => (
             <Card key={day}>
@@ -321,6 +324,8 @@ export function TimetablePage() {
             </Card>
           ))}
         </div>
+        <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit session' : 'Add session'} width={560}>

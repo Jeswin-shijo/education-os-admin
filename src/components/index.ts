@@ -15,6 +15,7 @@ export * from './SearchableSelect';
 export * from './DatePicker';
 export * from './SearchBar';
 export * from './Table';
+export * from './Pagination';
 export * from './Modal';
 export * from './ConfirmDialog';
 export * from './PageHeader';

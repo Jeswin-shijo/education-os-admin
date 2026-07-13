@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
 import type { Section, Shift } from '../../data/types';
 
@@ -21,12 +22,13 @@ import {
   Banner,
   Loading,
   EmptyState,
+  Pagination,
 } from '../../components';
 
 export function SectionsPage() {
   const { data: programs } = useAsync(() => adminService.programs.list(), []);
   const { data: semesters } = useAsync(() => adminService.semesters.list(), []);
-  const { data: rows, loading, reload } = useAsync(() => adminService.sections.list(), []);
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.sections.listPage(undefined, p), []);
 
   const semesterLabel = (id: string) => {
     const sem = semesters?.find((s) => s.id === id);
@@ -124,10 +126,13 @@ export function SectionsPage() {
 
       {loading ? (
         <Loading />
-      ) : !rows || rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="academics" title="No sections found" actionLabel="Add section" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <>
+          <Table columns={columns} rows={rows} />
+          <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add section">

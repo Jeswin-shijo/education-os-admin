@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../services';
-import { useAsync } from '../hooks/useAsync';
-import { PageHeader, SearchBar, Card, Badge, Loading, EmptyState, Button } from '../components';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { PageHeader, SearchBar, Card, Badge, Loading, EmptyState, Button, Pagination } from '../components';
 import { formatRelative } from '../lib/date';
 import type { AuditLog } from '../data/types';
 
@@ -14,13 +14,7 @@ const badgeTone: Record<AuditLog['action'], 'create' | 'update' | 'delete' | 'br
 
 export function AuditLogsPage() {
   const [q, setQ] = useState('');
-  const { data: rows, loading, reload } = useAsync(() => adminService.audit.list(), []);
-
-  const filtered = rows?.filter((log) => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return true;
-    return [log.actor, log.entity, log.detail, log.action].some((v) => v.toLowerCase().includes(needle));
-  });
+  const { rows, pagination, page, setPage, loading, reload } = usePaginatedList((p) => adminService.audit.listPage(q, p), [q]);
 
   return (
     <div>
@@ -36,12 +30,13 @@ export function AuditLogsPage() {
 
       {loading ? (
         <Loading />
-      ) : !filtered || filtered.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon="audit" title="No audit entries found" />
       ) : (
+        <>
         <Card padded={false}>
           <div className="divide-y divide-line-soft">
-            {filtered.map((log) => (
+            {rows.map((log) => (
               <div key={log.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                 <Badge label={log.action} tone={badgeTone[log.action]} />
                 <div className="min-w-0 flex-1">
@@ -55,6 +50,8 @@ export function AuditLogsPage() {
             ))}
           </div>
         </Card>
+        <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
+        </>
       )}
     </div>
   );
