@@ -333,7 +333,9 @@ export type Assignment = {
   status: AssignmentStatus;
 };
 
-export type MaterialKind = 'note' | 'pdf' | 'link' | 'video';
+// Mirrors the backend Material KIND_CHOICES (note/video/slide/link). `pdf` is retained for
+// legacy/seed rows only — new uploads use `slide` for PDFs and decks (the backend has no `pdf`).
+export type MaterialKind = 'note' | 'pdf' | 'slide' | 'link' | 'video';
 
 export type Material = {
   id: string;

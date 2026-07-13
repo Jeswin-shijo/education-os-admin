@@ -228,7 +228,7 @@ function studentToApiFields(input: Omit<Student, 'id'>): Record<string, string> 
   };
 }
 
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const res = await fetch(dataUrl);
   return res.blob();
 }
@@ -368,7 +368,7 @@ export const faculty = {
         return q ? rows.filter((f) => matches([f.name, f.email, f.department], q)) : rows;
       },
       async () => {
-        const rows = await http.get<FacultyApi[]>('/api/v1/faculty');
+        const rows = await http.getAll<FacultyApi>('/api/v1/faculty');
         const mapped = rows.map(mapFacultyFromApi);
         return q ? mapped.filter((f) => matches([f.name, f.email, f.department], q)) : mapped;
       },
@@ -672,7 +672,7 @@ export const departments = {
     return fromSource(
       () => db.read('departments'),
       async () => {
-        const rows = await http.get<{ id: string; code: string; name: string; hod?: string }[]>('/api/v1/departments/');
+        const rows = await http.getAll<{ id: string; code: string; name: string; hod?: string }>('/api/v1/departments/');
         return rows.map((d) => ({ id: d.id, code: d.code, name: d.name, hod: d.hod }));
       },
     );
@@ -691,7 +691,7 @@ export const departments = {
     return fromSource(
       () => Promise.resolve(seedHodCandidates),
       async () => {
-        const rows = await http.get<{ id: string; full_name: string; email: string; role: string }[]>('/api/v1/departments/hod-candidates');
+        const rows = await http.getAll<{ id: string; full_name: string; email: string; role: string }>('/api/v1/departments/hod-candidates');
         return rows.map((r) => ({ id: r.id, fullName: r.full_name, email: r.email, role: (r.role as 'faculty' | 'hod') ?? 'faculty' }));
       },
     );
@@ -755,7 +755,7 @@ export const programs = {
     return fromSource(
       () => db.read('programs'),
       async () => {
-        const rows = await http.get<{ id: string; code: string; name: string; department: string; duration_years: number; intake: number }[]>(
+        const rows = await http.getAll<{ id: string; code: string; name: string; department: string; duration_years: number; intake: number }>(
           '/api/v1/programs/',
         );
         return rows.map((p) => ({ id: p.id, code: p.code, name: p.name, departmentId: p.department, durationYears: p.duration_years, intake: p.intake, color: '#13327F' }));
@@ -853,8 +853,10 @@ export const semesters = {
         return programId ? rows.filter((s) => s.programId === programId) : rows;
       },
       async () => {
-        const path = programId ? `/api/v1/semesters/?program=${programId}` : '/api/v1/semesters/';
-        const rows = await http.get<{ id: string; program: string; number: number }[]>(path);
+        const rows = await http.getAll<{ id: string; program: string; number: number }>(
+          '/api/v1/semesters/',
+          programId ? { program: programId } : undefined,
+        );
         return rows.map((s) => ({ id: s.id, programId: s.program, number: s.number }));
       },
     );
@@ -917,8 +919,10 @@ export const sections = {
         return semesterIdFilter ? rows.filter((s) => s.semesterId === semesterIdFilter) : rows;
       },
       async () => {
-        const path = semesterIdFilter ? `/api/v1/sections/?semester=${semesterIdFilter}` : '/api/v1/sections/';
-        const rows = await http.get<{ id: string; semester: string; name: string; shift?: Shift }[]>(path);
+        const rows = await http.getAll<{ id: string; semester: string; name: string; shift?: Shift }>(
+          '/api/v1/sections/',
+          semesterIdFilter ? { semester: semesterIdFilter } : undefined,
+        );
         return rows.map((s) => ({ id: s.id, semesterId: s.semester, name: s.name, shift: s.shift }));
       },
     );
@@ -1016,7 +1020,7 @@ export const subjects = {
         return q ? rows.filter((s) => matches([s.name, s.code, s.facultyName], q)) : rows;
       },
       async () => {
-        const rows = await http.get<RawSubject[]>('/api/v1/subjects/');
+        const rows = await http.getAll<RawSubject>('/api/v1/subjects/');
         const mapped = rows.map(mapSubject);
         return q ? mapped.filter((s) => matches([s.name, s.code, s.facultyName, ...(s.facultyNames ?? [])], q)) : mapped;
       },
@@ -1043,7 +1047,7 @@ export const subjects = {
         return rows.map((f) => ({ id: f.id, fullName: f.name, email: f.email }));
       },
       async () => {
-        const rows = await http.get<{ id: string; full_name: string; email: string }[]>('/api/v1/subjects/faculty-candidates');
+        const rows = await http.getAll<{ id: string; full_name: string; email: string }>('/api/v1/subjects/faculty-candidates');
         return rows.map((r) => ({ id: r.id, fullName: r.full_name, email: r.email }));
       },
     );
@@ -1440,13 +1444,13 @@ export const fees = {
         const mapped: FeeInvoice[] = rows.map((f) => ({
           id: f.id as string,
           studentId: f.student as string,
-          studentName: (f.student_name as string) ?? '',
+          studentName: (f.studentName as string) ?? (f.student_name as string) ?? '',
           title: f.title as string,
           term: f.term as string,
-          amount: f.amount as number,
+          amount: Number(f.amount ?? 0),
           dueDate: (f.dueDate as string) ?? (f.due_date as string),
           status: f.status as FeeInvoice['status'],
-          paidOn: f.paidOn as string | undefined,
+          paidOn: (f.paidOn as string | undefined) ?? (f.paid_on as string | undefined),
         }));
         return q ? mapped.filter((f) => matches([f.studentName, f.title, f.term], q)) : mapped;
       },
@@ -1465,13 +1469,13 @@ export const fees = {
         const mapped: FeeInvoice[] = res.results.map((f) => ({
           id: f.id as string,
           studentId: f.student as string,
-          studentName: (f.student_name as string) ?? '',
+          studentName: (f.studentName as string) ?? (f.student_name as string) ?? '',
           title: f.title as string,
           term: f.term as string,
-          amount: f.amount as number,
+          amount: Number(f.amount ?? 0),
           dueDate: (f.dueDate as string) ?? (f.due_date as string),
           status: f.status as FeeInvoice['status'],
-          paidOn: f.paidOn as string | undefined,
+          paidOn: (f.paidOn as string | undefined) ?? (f.paid_on as string | undefined),
         }));
         return { results: mapped, pagination: res.pagination };
       },
@@ -1498,12 +1502,13 @@ export const fees = {
         const row: FeeInvoice = {
           id: data.id as string,
           studentId: input.studentId,
-          studentName: input.studentName,
+          studentName: (data.studentName as string) ?? (data.student_name as string) ?? input.studentName,
           title: data.title as string,
           term: data.term as string,
-          amount: data.amount as number,
+          amount: Number(data.amount ?? input.amount),
           dueDate: (data.dueDate as string) ?? input.dueDate,
           status: (data.status as FeeInvoice['status']) ?? 'pending',
+          paidOn: (data.paidOn as string | undefined) ?? (data.paid_on as string | undefined),
         };
         await logAction('create', 'Fee Invoice', `Added invoice "${row.title}" for ${row.studentName}`);
         return row;

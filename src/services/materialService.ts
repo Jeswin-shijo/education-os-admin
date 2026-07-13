@@ -2,7 +2,7 @@ import * as db from './db';
 import { http, type Paginated } from './http';
 import { fromSource } from './source';
 import * as authService from './authService';
-import { PAGE_SIZE, paginateLocal } from './adminService';
+import { PAGE_SIZE, paginateLocal, dataUrlToBlob } from './adminService';
 import type { AuditLog, Material } from '../data/types';
 
 type MaterialApi = { id: string; subjectId: string; title: string; kind: Material['kind']; sizeLabel?: string; url?: string; addedAt: string };
@@ -69,10 +69,13 @@ export async function listPage(subjectId: string | undefined, page: number): Pro
   );
 }
 
-export async function upload(input: Omit<Material, 'id' | 'addedAt'>): Promise<Material> {
+export async function upload(input: Omit<Material, 'id' | 'addedAt'> & { fileName?: string }): Promise<Material> {
+  // `fileName` is upload-only metadata (the picked file's original name) — keep it out of
+  // the stored Material row.
+  const { fileName, ...material } = input;
   return fromSource(
     async () => {
-      const row: Material = { ...input, id: genId('mat'), addedAt: new Date().toISOString() };
+      const row: Material = { ...material, id: genId('mat'), addedAt: new Date().toISOString() };
       await db.upsert('materials', row);
       await logAction('create', 'Material', `Uploaded material "${row.title}"`);
       return row;
@@ -80,14 +83,28 @@ export async function upload(input: Omit<Material, 'id' | 'addedAt'>): Promise<M
     async () => {
       // POST response shape isn't fully documented — build the Material from the request
       // echo plus a fresh timestamp rather than assuming more than the request body.
-      await http.post('/api/v1/materials/', {
-        subject: input.subjectId,
-        title: input.title,
-        kind: input.kind,
-        size_label: input.sizeLabel,
-        url: input.url,
-      });
-      const row: Material = { ...input, id: genId('mat'), addedAt: new Date().toISOString() };
+      // A picked file arrives as a data URL → send it as multipart `file` (the field the
+      // backend MaterialSerializer expects); a plain URL (legacy/link) goes as JSON `url`.
+      // Preserve the original filename (with extension) so downloads keep their type.
+      const isUpload = typeof material.url === 'string' && material.url.startsWith('data:');
+      if (isUpload) {
+        const form = new FormData();
+        form.append('subject', material.subjectId);
+        form.append('title', material.title);
+        form.append('kind', material.kind);
+        if (material.sizeLabel) form.append('size_label', material.sizeLabel);
+        form.append('file', await dataUrlToBlob(material.url), fileName || material.title || 'material');
+        await http.postForm('/api/v1/materials/', form);
+      } else {
+        await http.post('/api/v1/materials/', {
+          subject: material.subjectId,
+          title: material.title,
+          kind: material.kind,
+          size_label: material.sizeLabel,
+          url: material.url,
+        });
+      }
+      const row: Material = { ...material, id: genId('mat'), addedAt: new Date().toISOString() };
       await logAction('create', 'Material', `Uploaded material "${row.title}"`);
       return row;
     },

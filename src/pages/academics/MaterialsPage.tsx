@@ -23,14 +23,34 @@ import {
 } from '../../components';
 
 const ALL_SUBJECTS = '__all__';
-const MATERIAL_KINDS: MaterialKind[] = ['note', 'pdf', 'link', 'video'];
+// Kinds offered when uploading a file. `link` is excluded (a link needs a URL, which this
+// modal no longer collects). These are backend-valid Material kinds — note that the backend
+// has no `pdf`; PDFs and slide decks are represented as `slide`.
+const UPLOADABLE_KINDS: MaterialKind[] = ['note', 'slide', 'video'];
+// Mock mode persists the file as a data URL in localStorage (~5MB origin quota, and base64
+// inflates it ~33%), so keep uploads small — in line with the profile-photo pickers.
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB
 
 const kindTone: Record<MaterialKind, 'create' | 'update' | 'delete' | 'broadcast' | 'neutral'> = {
   note: 'update',
   pdf: 'delete',
+  slide: 'neutral',
   link: 'broadcast',
   video: 'create',
 };
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  return kb < 1024 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`;
+}
+
+// The backend has no `pdf` kind — PDFs and slide decks map to `slide`.
+function inferKind(file: File): MaterialKind {
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) return 'slide';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'note';
+}
 
 const emptyForm = {
   subjectId: '',
@@ -50,6 +70,7 @@ export function MaterialsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [fileName, setFileName] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
@@ -57,6 +78,31 @@ export function MaterialsPage() {
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
     clearError(key as string);
+  }
+
+  function handleFileChange(file: File | undefined) {
+    clearError('file');
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      setFileName(undefined);
+      setForm((f) => ({ ...f, url: '' }));
+      setErrors((e) => ({ ...e, file: `File is too large — please choose one under ${formatBytes(MAX_FILE_BYTES)}` }));
+      return;
+    }
+    setFileName(file.name);
+    const reader = new FileReader();
+    // Read the file into a data URL (same approach as the profile-photo pickers) and
+    // auto-fill size + kind from the file; both stay editable in the fields below.
+    reader.onload = () =>
+      setForm((f) => ({
+        ...f,
+        url: String(reader.result ?? ''),
+        // Recompute size + kind from the file on every pick (so re-picking a different
+        // file updates them); both remain editable in the fields below.
+        sizeLabel: formatBytes(file.size),
+        kind: inferKind(file),
+      }));
+    reader.readAsDataURL(file);
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
@@ -74,6 +120,7 @@ export function MaterialsPage() {
 
   function openCreate() {
     setForm({ ...emptyForm, subjectId: subjects?.[0]?.id ?? '' });
+    setFileName(undefined);
     setFormError(undefined);
     resetErrors();
     setModalOpen(true);
@@ -83,7 +130,7 @@ export function MaterialsPage() {
     const e: Record<string, string> = {};
     if (!form.subjectId) e.subjectId = 'Subject is required';
     if (!form.title.trim()) e.title = 'Title is required';
-    if (!form.url.trim()) e.url = 'URL is required';
+    if (!form.url) e.file = 'File is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -99,6 +146,7 @@ export function MaterialsPage() {
         kind: form.kind,
         sizeLabel: form.sizeLabel || undefined,
         url: form.url,
+        fileName,
       };
       await materialService.upload(payload);
       setSuccessMsg(`Uploaded "${payload.title}"`);
@@ -190,7 +238,7 @@ export function MaterialsPage() {
               label="Kind"
               value={form.kind}
               onChange={(v) => setForm((f) => ({ ...f, kind: v as MaterialKind }))}
-              options={MATERIAL_KINDS.map((k) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), value: k }))}
+              options={UPLOADABLE_KINDS.map((k) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), value: k }))}
             />
             <TextField
               label="Size label (optional)"
@@ -199,7 +247,22 @@ export function MaterialsPage() {
               placeholder="2.4 MB"
             />
           </div>
-          <TextField label="URL" required error={errors.url} value={form.url} onChangeText={(v) => setField('url', v)} placeholder="https://…" />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-label uppercase tracking-wide text-ink-muted">
+              File<span className="text-danger"> *</span>
+            </span>
+            <input
+              type="file"
+              onChange={(e) => handleFileChange(e.target.files?.[0])}
+              className="block w-full text-small text-ink-muted file:mr-3 file:rounded-md file:border-0 file:bg-navy-soft file:px-3 file:py-1.5 file:text-small file:font-semibold file:text-navy hover:file:bg-navy-soft/70"
+            />
+            {fileName && !errors.file && (
+              <span className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full bg-navy-soft px-2.5 py-1 text-caption text-navy">
+                {fileName}
+              </span>
+            )}
+            {errors.file && <span className="text-caption text-danger">{errors.file}</span>}
+          </div>
           <div className="flex justify-end gap-2">
             <Button label="Cancel" variant="outline" size="sm" onClick={() => setModalOpen(false)} />
             <Button label="Upload material" size="sm" loading={saving} onClick={handleSave} />

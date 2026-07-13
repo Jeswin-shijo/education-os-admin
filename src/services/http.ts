@@ -211,4 +211,24 @@ export const http = {
       },
     };
   },
+  /**
+   * GET every page of a collection and return the flattened array. Backend list
+   * endpoints are paginated (page_size 25, max 100) and `get` only ever sees page 1,
+   * so any list used to populate a dropdown or resolve an id → name MUST page through
+   * the rest here — otherwise entities beyond the first page render as raw ids.
+   * Non-paginated endpoints (bare array) resolve in a single request via the
+   * getPaginated array fallback (totalPages = 1).
+   */
+  getAll: async <T>(
+    path: string,
+    params?: Record<string, string | number | undefined | null>,
+  ): Promise<T[]> => {
+    const first = await http.getPaginated<T>(path, { ...params, page: 1, limit: 100 });
+    const all = [...first.results];
+    for (let page = 2; page <= first.pagination.totalPages; page++) {
+      const next = await http.getPaginated<T>(path, { ...params, page, limit: 100 });
+      all.push(...next.results);
+    }
+    return all;
+  },
 };
