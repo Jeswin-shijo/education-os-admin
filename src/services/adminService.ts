@@ -350,19 +350,30 @@ export const faculty = {
       },
       async () => {
         // One call creates the faculty User + FacultyProfile. `department` accepts an
-        // id/code/name; profile fields (designation/qualifications/experience/photo_url)
-        // persist server-side. Response mirrors a list row → map it straight back.
-        const data = await http.post<FacultyApi>('/api/v1/faculty', {
+        // id/code/name; profile fields persist server-side. A picked photo arrives as a
+        // data URL → upload it as multipart `profile_pic` (stored on the user's image
+        // field → object storage); otherwise send plain JSON. Response mirrors a list
+        // row → map it straight back.
+        const fields: Record<string, string> = {
           full_name: input.name,
           email: input.email,
           phone: input.phone,
           department: input.department,
           designation: input.designation,
-          qualifications: input.qualifications,
-          experience: input.experience,
-          photo_url: input.photoUrl ?? '',
+          qualifications: input.qualifications ?? '',
+          experience: input.experience ?? '',
           ...(input.password ? { password: input.password } : {}),
-        });
+        };
+        const isUpload = typeof input.photoUrl === 'string' && input.photoUrl.startsWith('data:');
+        let data: FacultyApi;
+        if (isUpload) {
+          const form = new FormData();
+          Object.entries(fields).forEach(([k, v]) => form.append(k, v ?? ''));
+          form.append('profile_pic', await dataUrlToBlob(input.photoUrl as string), 'faculty.jpg');
+          data = await http.postForm<FacultyApi>('/api/v1/faculty', form);
+        } else {
+          data = await http.post<FacultyApi>('/api/v1/faculty', fields);
+        }
         const row = mapFacultyFromApi(data);
         await logAction('create', 'Faculty', `Added faculty ${row.name}`);
         return row;
@@ -384,13 +395,22 @@ export const faculty = {
         // PATCH the FacultyProfile (id from list() is the profile id). Only the
         // profile-owned fields are writable here — name/email live on the user and
         // are read-only on this endpoint. phone is synced back to the user server-side.
-        const body: Record<string, unknown> = {};
-        if (patch.phone !== undefined) body.phone = patch.phone;
-        if (patch.designation !== undefined) body.designation = patch.designation;
-        if (patch.qualifications !== undefined) body.qualifications = patch.qualifications;
-        if (patch.experience !== undefined) body.experience = patch.experience;
-        if (patch.photoUrl !== undefined) body.photo_url = patch.photoUrl ?? '';
-        await http.patch(`/api/v1/faculty/${id}`, body);
+        // A newly-picked photo arrives as a data URL → PATCH it as multipart
+        // `profile_pic`; an unchanged photo (already an http URL) is left untouched.
+        const fields: Record<string, string> = {};
+        if (patch.phone !== undefined) fields.phone = patch.phone;
+        if (patch.designation !== undefined) fields.designation = patch.designation;
+        if (patch.qualifications !== undefined) fields.qualifications = patch.qualifications ?? '';
+        if (patch.experience !== undefined) fields.experience = patch.experience ?? '';
+        const isUpload = typeof patch.photoUrl === 'string' && patch.photoUrl.startsWith('data:');
+        if (isUpload) {
+          const form = new FormData();
+          Object.entries(fields).forEach(([k, v]) => form.append(k, v ?? ''));
+          form.append('profile_pic', await dataUrlToBlob(patch.photoUrl as string), 'faculty.jpg');
+          await http.patchForm(`/api/v1/faculty/${id}`, form);
+        } else {
+          await http.patch(`/api/v1/faculty/${id}`, fields);
+        }
         const rows = await this.list();
         const updated = rows.find((f) => f.id === id);
         if (!updated) throw new Error('Faculty not found after update');

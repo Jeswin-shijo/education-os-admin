@@ -20,6 +20,7 @@ import {
 } from '../../components';
 
 const PURPLE = '#7C3AED';
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024; // 2MB — uploaded to object storage, not localStorage
 
 const emptyForm = {
   name: '',
@@ -41,7 +42,20 @@ export function FacultyPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const [photoError, setPhotoError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+
+  function handlePhotoChange(file: File | undefined) {
+    setPhotoError(undefined);
+    if (!file) return;
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('Photo is too large — please choose one under 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((f) => ({ ...f, photoUrl: String(reader.result ?? '') }));
+    reader.readAsDataURL(file);
+  }
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -57,6 +71,7 @@ export function FacultyPage() {
     setEditing(null);
     setForm(emptyForm);
     setFormError(undefined);
+    setPhotoError(undefined);
     resetErrors();
     setModalOpen(true);
   }
@@ -74,6 +89,7 @@ export function FacultyPage() {
       photoUrl: f.photoUrl ?? '',
     });
     setFormError(undefined);
+    setPhotoError(undefined);
     resetErrors();
     setModalOpen(true);
   }
@@ -201,16 +217,17 @@ export function FacultyPage() {
             <TextField label="Designation" value={form.designation} onChangeText={(v) => setForm((f) => ({ ...f, designation: v }))} />
           </div>
           <TextField label="Department" required error={errors.department} value={form.department} onChangeText={(v) => setField('department', v)} />
-          <div className="flex items-end gap-3">
-            {form.photoUrl && <Avatar name={form.name || 'Faculty'} size={44} color={editing?.avatarColor ?? PURPLE} uri={form.photoUrl} />}
+          <div className="flex items-center gap-3">
+            <Avatar name={form.name || 'Faculty'} size={44} color={editing?.avatarColor ?? PURPLE} uri={form.photoUrl || undefined} />
             <div className="flex-1">
-              <TextField
-                label="Profile picture URL"
-                autoComplete="off"
-                placeholder="https://…"
-                value={form.photoUrl}
-                onChangeText={(v) => setForm((f) => ({ ...f, photoUrl: v }))}
+              <label className="text-label uppercase tracking-wide text-ink-muted">Profile picture</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+                className="mt-1 block w-full text-small text-ink-muted file:mr-3 file:rounded-md file:border-0 file:bg-navy-soft file:px-3 file:py-1.5 file:text-small file:font-semibold file:text-navy hover:file:bg-navy-soft/70"
               />
+              {photoError && <div className="mt-1 text-caption text-danger">{photoError}</div>}
             </div>
           </div>
           <label className="flex flex-col gap-1.5">

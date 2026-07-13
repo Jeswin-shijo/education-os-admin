@@ -163,4 +163,6 @@ export const http = {
   delete: <T>(path: string, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) => request<T>(path, { ...opts, method: 'DELETE' }),
   postForm: <T>(path: string, form: FormData, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) =>
     request<T>(path, { ...opts, method: 'POST', form }),
+  patchForm: <T>(path: string, form: FormData, opts?: Omit<RequestOptions, 'method' | 'body' | 'form'>) =>
+    request<T>(path, { ...opts, method: 'PATCH', form }),
 };

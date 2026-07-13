@@ -19,15 +19,15 @@ import {
 // Standard department code/name presets — keeps entries consistent instead of free text.
 const DEPARTMENT_PRESETS = [
   { code: 'CSE', name: 'Computer Science & Engineering' },
+  { code: 'CSE-AI', name: 'Computer Science & Engineering (Artificial Intelligence)' },
+  { code: 'CSE-DS', name: 'Computer Science & Engineering (Data Science)' },
+  { code: 'IT', name: 'Information Technology' },
   { code: 'ECE', name: 'Electronics & Communication Engineering' },
   { code: 'EEE', name: 'Electrical & Electronics Engineering' },
   { code: 'MECH', name: 'Mechanical Engineering' },
   { code: 'CIVIL', name: 'Civil Engineering' },
-  { code: 'IT', name: 'Information Technology' },
-  { code: 'CHEM', name: 'Chemical Engineering' },
-  { code: 'BIOTECH', name: 'Biotechnology' },
-  { code: 'MBA', name: 'Business Administration' },
-  { code: 'MCA', name: 'Computer Applications' },
+  { code: 'AI&DS', name: 'Artificial Intelligence & Data Science' },
+  { code: 'BME', name: 'Biomedical Engineering' },
 ];
 
 const NO_HOD = '__none__';
