@@ -71,13 +71,19 @@ export function SubjectsPage() {
   };
   const programsForDept = (departmentId: string) => (allPrograms ?? []).filter((p) => p.departmentId === departmentId);
 
-  async function loadSemesters(programId: string) {
+  async function loadSemesters(programId: string, preferredId?: string) {
     if (!programId) {
       setSemesterOptions([]);
+      setForm((f) => ({ ...f, semesterId: '' }));
       return;
     }
     const rows = await adminService.semesters.list(programId);
-    setSemesterOptions(rows.map((s) => ({ id: s.id, number: s.number })));
+    const opts = rows.map((s) => ({ id: s.id, number: s.number }));
+    setSemesterOptions(opts);
+    // Sync state to the option the native <select> actually displays (the first one),
+    // unless a valid existing value is preferred (edit flow).
+    const nextId = preferredId && opts.some((o) => o.id === preferredId) ? preferredId : (opts[0]?.id ?? '');
+    setForm((f) => ({ ...f, semesterId: nextId }));
   }
 
   async function openCreate() {
@@ -105,7 +111,7 @@ export function SubjectsPage() {
       academicSession: s.academicSession ?? '',
       facultyIds: s.facultyIds ?? (s.facultyId ? [s.facultyId] : []),
     });
-    await loadSemesters(owningProgramId);
+    await loadSemesters(owningProgramId, s.semesterId);
     setFormError(undefined);
     resetErrors();
     setModalOpen(true);
