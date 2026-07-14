@@ -364,24 +364,38 @@ export function TimetablePage() {
               onChange={setSemester}
               options={[{ label: 'Select semester', value: '' }, ...semesterOptions]}
             />
-            <Select
-              label="Section"
-              required
-              error={errors.sectionId}
-              value={form.sectionId}
-              onChange={setSection}
-              options={[{ label: 'Select section', value: '' }, ...sectionOptions]}
-            />
+            <div>
+              <Select
+                label="Section"
+                required
+                error={errors.sectionId}
+                value={form.sectionId}
+                onChange={setSection}
+                options={[{ label: 'Select section', value: '' }, ...sectionOptions]}
+              />
+              {form.semesterId && sectionOptions.length === 0 ? (
+                <span className="mt-1 block text-caption text-ink-muted">
+                  No sections for this semester yet — create one on the Sections page.
+                </span>
+              ) : null}
+            </div>
           </div>
 
-          <Select
-            label="Subject"
-            required
-            error={errors.subjectId}
-            value={form.subjectId}
-            onChange={setSubject}
-            options={[{ label: 'Select subject', value: '' }, ...subjectOptions]}
-          />
+          <div>
+            <Select
+              label="Subject"
+              required
+              error={errors.subjectId}
+              value={form.subjectId}
+              onChange={setSubject}
+              options={[{ label: 'Select subject', value: '' }, ...subjectOptions]}
+            />
+            {form.semesterId && subjectOptions.length === 0 ? (
+              <span className="mt-1 block text-caption text-ink-muted">
+                No subjects for this semester yet — create one on the Subjects page.
+              </span>
+            ) : null}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Select

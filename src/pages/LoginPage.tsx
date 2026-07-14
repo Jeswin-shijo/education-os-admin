@@ -6,7 +6,9 @@ import { Button, TextField, Banner, Logo } from '../components';
 export function LoginPage() {
   const { status, login } = useAuth();
   const [email, setEmail] = useState('admin@campus.edu.in');
-  const [password, setPassword] = useState('admin');
+  // Matches the backend seed_demo password (campus123) so the demo login works
+  // out of the box against a seeded local/Docker backend.
+  const [password, setPassword] = useState('campus123');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +43,7 @@ export function LoginPage() {
           <TextField label="Password" type="password" value={password} onChangeText={setPassword} placeholder="••••••••" />
           <Button label="Log in" type="submit" full loading={loading} />
           <p className="text-center text-caption text-ink-soft">
-            Demo login prefilled — admin@campus.edu.in / admin
+            Demo login prefilled — admin@campus.edu.in / campus123
           </p>
         </form>
       </div>

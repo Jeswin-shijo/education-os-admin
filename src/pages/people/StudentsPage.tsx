@@ -439,14 +439,21 @@ export function StudentsPage() {
               onChange={handleSemesterChange}
               options={semesterOptions.map((s) => ({ label: `Semester ${s.number}`, value: s.id }))}
             />
-            <Select
-              label="Section"
-              required
-              error={errors.sectionId}
-              value={form.sectionId}
-              onChange={(v) => setField('sectionId', v)}
-              options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
-            />
+            <div>
+              <Select
+                label="Section"
+                required
+                error={errors.sectionId}
+                value={form.sectionId}
+                onChange={(v) => setField('sectionId', v)}
+                options={sectionOptions.map((s) => ({ label: `Section ${s.name}`, value: s.id }))}
+              />
+              {form.semesterId && sectionOptions.length === 0 ? (
+                <span className="mt-1 block text-caption text-ink-muted">
+                  No sections for this semester yet — create one on the Sections page.
+                </span>
+              ) : null}
+            </div>
             <TextField label="Year" type="number" value={form.year} onChangeText={(v) => setForm((f) => ({ ...f, year: v }))} />
             <TextField label="CGPA" type="number" value={form.cgpa} onChangeText={(v) => setForm((f) => ({ ...f, cgpa: v }))} />
             <Select
