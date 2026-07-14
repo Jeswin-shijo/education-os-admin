@@ -15,6 +15,7 @@ import {
   TextField,
   Select,
   DatePicker,
+  TimePicker,
   StatusPill,
   ConfirmDialog,
   Banner,
@@ -23,13 +24,12 @@ import {
   Pagination,
 } from '../../components';
 
-const EXAM_TYPES: ExamType[] = ['mid', 'final', 'internal', 'quiz'];
+const EXAM_TYPES: ExamType[] = ['Internal', 'Semester', 'Quiz'];
 
 const typeStatus: Record<ExamType, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
-  mid: 'info',
-  final: 'danger',
-  internal: 'warning',
-  quiz: 'neutral',
+  Internal: 'warning',
+  Semester: 'danger',
+  Quiz: 'neutral',
 };
 
 const emptyForm = {
@@ -39,7 +39,7 @@ const emptyForm = {
   time: '',
   room: '',
   durationMins: '60',
-  type: 'mid' as ExamType,
+  type: 'Internal' as ExamType,
 };
 
 export function ExamsPage() {
@@ -214,7 +214,7 @@ export function ExamsPage() {
           <TextField label="Exam name" required error={errors.name} value={form.name} onChangeText={(v) => setField('name', v)} placeholder="Mid Semester Exam" />
           <div className="grid grid-cols-2 gap-3">
             <DatePicker label="Date" required error={errors.date} value={form.date} onChange={(v) => setField('date', v)} />
-            <TextField label="Time" required error={errors.time} value={form.time} onChangeText={(v) => setField('time', v)} placeholder="10:00" />
+            <TimePicker label="Time" required error={errors.time} value={form.time} onChange={(v) => setField('time', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Room" required error={errors.room} value={form.room} onChangeText={(v) => setField('room', v)} placeholder="Hall-A" />

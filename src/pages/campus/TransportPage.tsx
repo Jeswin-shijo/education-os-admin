@@ -10,6 +10,7 @@ import {
   type Column,
   Modal,
   TextField,
+  TimePicker,
   Select,
   Chip,
   Banner,
@@ -344,7 +345,7 @@ export function TransportPage() {
           />
           <TextField label="Stop name" required error={stopErrors.errors.name} value={stopForm.name} onChangeText={(v) => { setStopForm((f) => ({ ...f, name: v })); stopErrors.clearError('name'); }} />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="Time" value={stopForm.time} onChangeText={(v) => setStopForm((f) => ({ ...f, time: v }))} placeholder="07:30" />
+            <TimePicker label="Time" value={stopForm.time} onChange={(v) => setStopForm((f) => ({ ...f, time: v }))} />
             <TextField label="Order" type="number" value={stopForm.order} onChangeText={(v) => setStopForm((f) => ({ ...f, order: v }))} />
           </div>
           <div className="flex justify-end gap-2">

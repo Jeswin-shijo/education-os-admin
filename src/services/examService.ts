@@ -25,30 +25,36 @@ async function logAction(action: AuditLog['action'], entity: string, detail: str
 // =====================================================================================
 // Exams
 // =====================================================================================
+// The LIST endpoint serializes with the camelCase App serializer, while
+// create/retrieve go through the snake_case CRUD serializer — read both.
 type ExamApi = {
   id: string;
-  subject: string;
+  subject?: string;
+  subjectId?: string;
   subject_code?: string;
+  subjectCode?: string;
   subject_name?: string;
+  subjectName?: string;
   name: string;
   date: string;
   time: string;
   room: string;
-  duration_mins: number;
+  duration_mins?: number;
+  durationMins?: number;
   type: Exam['type'];
 };
 
 function mapExam(e: ExamApi): Exam {
   return {
     id: e.id,
-    subjectId: e.subject,
-    subjectCode: e.subject_code,
-    subjectName: e.subject_name,
+    subjectId: e.subjectId ?? e.subject ?? '',
+    subjectCode: e.subjectCode ?? e.subject_code,
+    subjectName: e.subjectName ?? e.subject_name,
     name: e.name,
     date: e.date,
     time: e.time,
     room: e.room,
-    durationMins: e.duration_mins,
+    durationMins: Number(e.durationMins ?? e.duration_mins ?? 0),
     type: e.type,
   };
 }
@@ -158,35 +164,43 @@ export const exams = {
 // =====================================================================================
 // Results
 // =====================================================================================
+// LIST = camelCase App serializer; create/retrieve = snake_case CRUD serializer.
+// Decimal fields arrive as strings, so coerce the numerics with Number().
 type ExamResultApi = {
   id: string;
-  student: string;
+  student?: string;
+  studentId?: string;
   student_name?: string;
-  subject: string;
+  studentName?: string;
+  subject?: string;
+  subjectId?: string;
   subject_name?: string;
+  subjectName?: string;
   exam_ref?: string;
   exam: string;
-  marks: number;
-  max_marks: number;
+  marks: number | string;
+  max_marks?: number | string;
+  maxMarks?: number | string;
   grade: string;
-  grade_point: number;
-  credits: number;
+  grade_point?: number | string;
+  gradePoint?: number | string;
+  credits: number | string;
 };
 
 function mapResult(r: ExamResultApi): ExamResult {
   return {
     id: r.id,
-    studentId: r.student,
-    studentName: r.student_name,
-    subjectId: r.subject,
-    subjectName: r.subject_name,
+    studentId: r.studentId ?? r.student ?? '',
+    studentName: r.studentName ?? r.student_name,
+    subjectId: r.subjectId ?? r.subject ?? '',
+    subjectName: r.subjectName ?? r.subject_name,
     examRef: r.exam_ref,
     exam: r.exam,
-    marks: r.marks,
-    maxMarks: r.max_marks,
+    marks: Number(r.marks ?? 0),
+    maxMarks: Number(r.maxMarks ?? r.max_marks ?? 0),
     grade: r.grade,
-    gradePoint: r.grade_point,
-    credits: r.credits,
+    gradePoint: Number(r.gradePoint ?? r.grade_point ?? 0),
+    credits: Number(r.credits ?? 0),
   };
 }
 

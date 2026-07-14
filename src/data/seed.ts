@@ -249,8 +249,8 @@ export const auditLogs: AuditLog[] = [
 
 // ---------- Exams & Results ----------
 export const exams: Exam[] = [
-  { id: 'exam-1', subjectId: 'sub-ds', subjectCode: 'CS301', subjectName: 'Data Structures', name: 'Mid Semester Exam', date: offsetDate(10), time: '10:00', room: 'Hall-A', durationMins: 120, type: 'mid' },
-  { id: 'exam-2', subjectId: 'sub-dbms', subjectCode: 'CS302', subjectName: 'Database Management Systems', name: 'Mid Semester Exam', date: offsetDate(12), time: '10:00', room: 'Hall-A', durationMins: 120, type: 'mid' },
+  { id: 'exam-1', subjectId: 'sub-ds', subjectCode: 'CS301', subjectName: 'Data Structures', name: 'Mid Semester Exam', date: offsetDate(10), time: '10:00', room: 'Hall-A', durationMins: 120, type: 'Internal' },
+  { id: 'exam-2', subjectId: 'sub-dbms', subjectCode: 'CS302', subjectName: 'Database Management Systems', name: 'Mid Semester Exam', date: offsetDate(12), time: '10:00', room: 'Hall-A', durationMins: 120, type: 'Internal' },
 ];
 
 export const examResults: ExamResult[] = [

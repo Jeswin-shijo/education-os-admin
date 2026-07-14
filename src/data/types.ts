@@ -277,7 +277,9 @@ export type AdminDashboard = {
 };
 
 // ---------- Exams & Results ----------
-export type ExamType = 'mid' | 'final' | 'internal' | 'quiz';
+// Must match the backend Exam.TYPE_CHOICES exactly (capitalized), or POST /exams
+// rejects with "… is not a valid choice."
+export type ExamType = 'Internal' | 'Semester' | 'Quiz';
 
 export type Exam = {
   id: string;

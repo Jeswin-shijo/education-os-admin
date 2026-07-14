@@ -13,6 +13,7 @@ export * from './TextField';
 export * from './Select';
 export * from './SearchableSelect';
 export * from './DatePicker';
+export * from './TimePicker';
 export * from './SearchBar';
 export * from './Table';
 export * from './Pagination';

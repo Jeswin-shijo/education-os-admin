@@ -5,28 +5,35 @@ import * as authService from './authService';
 import { PAGE_SIZE, paginateLocal } from './adminService';
 import type { Assignment, AuditLog } from '../data/types';
 
+// LIST = camelCase (StudentAssignmentSerializer); create/retrieve = snake_case
+// (CRUD serializer). Read both so subject/date/marks populate either way.
 type AssignmentApi = {
   id: string;
-  subject: string;
+  subject?: string;
+  subjectId?: string;
   subject_code?: string;
+  subjectCode?: string;
   subject_name?: string;
+  subjectName?: string;
   title: string;
   description: string;
-  due_date: string;
-  max_marks: number;
+  due_date?: string;
+  dueDate?: string;
+  max_marks?: number | string;
+  maxMarks?: number | string;
   status: Assignment['status'];
 };
 
 function mapAssignment(a: AssignmentApi): Assignment {
   return {
     id: a.id,
-    subjectId: a.subject,
-    subjectCode: a.subject_code,
-    subjectName: a.subject_name,
+    subjectId: a.subjectId ?? a.subject ?? '',
+    subjectCode: a.subjectCode ?? a.subject_code,
+    subjectName: a.subjectName ?? a.subject_name,
     title: a.title,
     description: a.description,
-    dueDate: a.due_date,
-    maxMarks: a.max_marks,
+    dueDate: a.dueDate ?? a.due_date ?? '',
+    maxMarks: Number(a.maxMarks ?? a.max_marks ?? 0),
     status: a.status,
   };
 }
@@ -45,20 +52,8 @@ export async function list(): Promise<Assignment[]> {
   return fromSource(
     () => db.read('assignments'),
     async () => {
-      const rows = await http.get<
-        { id: string; subject: string; subject_code?: string; subject_name?: string; title: string; description: string; due_date: string; max_marks: number; status: Assignment['status'] }[]
-      >('/api/v1/assignments/');
-      return rows.map((a) => ({
-        id: a.id,
-        subjectId: a.subject,
-        subjectCode: a.subject_code,
-        subjectName: a.subject_name,
-        title: a.title,
-        description: a.description,
-        dueDate: a.due_date,
-        maxMarks: a.max_marks,
-        status: a.status,
-      }));
+      const rows = await http.get<AssignmentApi[]>('/api/v1/assignments/');
+      return rows.map(mapAssignment);
     },
   );
 }

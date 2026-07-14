@@ -11,6 +11,7 @@ import {
   Card,
   Modal,
   TextField,
+  TimePicker,
   Select,
   StatusPill,
   ConfirmDialog,
@@ -422,8 +423,8 @@ export function TimetablePage() {
               onChange={(v) => setField('day', v as Weekday)}
               options={WEEKDAYS.map((d) => ({ label: d, value: d }))}
             />
-            <TextField label="Start" required error={errors.start} placeholder="09:00" value={form.start} onChangeText={(v) => setField('start', v)} />
-            <TextField label="End" required error={errors.end} placeholder="10:00" value={form.end} onChangeText={(v) => setField('end', v)} />
+            <TimePicker label="Start" required error={errors.start} value={form.start} onChange={(v) => setField('start', v)} />
+            <TimePicker label="End" required error={errors.end} value={form.end} onChange={(v) => setField('end', v)} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

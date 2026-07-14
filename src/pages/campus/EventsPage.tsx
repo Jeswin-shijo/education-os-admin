@@ -13,6 +13,7 @@ import {
   TextField,
   Select,
   DatePicker,
+  TimePicker,
   StatusPill,
   ConfirmDialog,
   Banner,
@@ -168,7 +169,7 @@ export function EventsPage() {
           <TextField label="Title" required error={errors.title} value={form.title} onChangeText={(v) => setField('title', v)} />
           <div className="grid grid-cols-2 gap-3">
             <DatePicker label="Date" required error={errors.date} value={form.date} onChange={(v) => setField('date', v)} />
-            <TextField label="Time" required error={errors.time} value={form.time} onChangeText={(v) => setField('time', v)} placeholder="e.g. 10:00 AM" />
+            <TimePicker label="Time" required error={errors.time} value={form.time} onChange={(v) => setField('time', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Venue" required error={errors.venue} value={form.venue} onChangeText={(v) => setField('venue', v)} />
