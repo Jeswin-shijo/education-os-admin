@@ -28,7 +28,7 @@ const APP_ENV: AppEnvironment =
 
 // Deployed AWS backend (plain http on port 80).
 const PROD_API_BASE_URL =
-  (import.meta.env.VITE_PROD_API_BASE_URL as string | undefined) ?? 'http://13.206.201.237';
+  (import.meta.env.VITE_PROD_API_BASE_URL as string | undefined) ?? 'https://aicampusos.duckdns.org';
 
 // Render / staging backend.
 const STAGING_API_BASE_URL =

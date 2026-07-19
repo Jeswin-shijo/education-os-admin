@@ -1,10 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../state/AuthContext';
 import { Avatar, Icon } from '../components';
 
 export function Topbar({ onMenuClick, onSearchClick }: { onMenuClick: () => void; onSearchClick: () => void }) {
   const { admin, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the account menu on an outside click or Escape (matches Select/SearchableSelect).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:px-6">
@@ -28,7 +47,7 @@ export function Topbar({ onMenuClick, onSearchClick }: { onMenuClick: () => void
           <kbd className="hidden rounded border border-line bg-surface-alt px-1.5 py-0.5 text-caption lg:inline">⌘K</kbd>
         </button>
       </div>
-      <div className="relative">
+      <div className="relative" ref={menuRef}>
         <button type="button" onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-surface-alt">
           {admin && <Avatar name={admin.name} size={34} color={admin.avatarColor} />}
           <div className="hidden text-left sm:block">
