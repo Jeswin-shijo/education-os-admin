@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Department } from '../../data/types';
 import {
   PageHeader,
@@ -52,9 +53,8 @@ export function DepartmentsPage() {
   const { errors, setErrors, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   function hodName(id?: string): string | undefined {
     return hodCandidates?.find((c) => c.id === id)?.fullName;
@@ -112,10 +112,10 @@ export function DepartmentsPage() {
       };
       if (editing) {
         await adminService.departments.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Department updated', payload.name);
       } else {
         await adminService.departments.create(payload);
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Department added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -128,14 +128,16 @@ export function DepartmentsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.departments.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Department removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove department');
+      setDeleteTarget(null);
+      toast.error('Could not remove department', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -165,12 +167,6 @@ export function DepartmentsPage() {
         subtitle={rows ? `${rows.length} departments` : undefined}
         action={<Button label="Add department" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -222,15 +218,11 @@ export function DepartmentsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove department"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

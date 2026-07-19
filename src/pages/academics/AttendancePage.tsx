@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import * as attendanceService from '../../services/attendanceService';
 import type { AttendanceBreakdownRow } from '../../services/attendanceService';
 import { useAsync } from '../../hooks/useAsync';
+import { useToast } from '../../state/ToastContext';
 import { formatPercent } from '../../lib';
 import { toLocalISODate } from '../../lib/date';
 import type { AttendanceStatus, Student } from '../../data/types';
@@ -172,8 +173,7 @@ function MarkAttendanceTab() {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [entries, setEntries] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const selected = selectedIdx != null && periods ? periods[selectedIdx] : null;
   const periodNumber = selectedIdx != null ? selectedIdx + 1 : 1;
@@ -182,15 +182,13 @@ function MarkAttendanceTab() {
     const p = periods?.[idx];
     if (!p) return;
     setSelectedIdx(idx);
-    setSuccessMsg(undefined);
-    setError(undefined);
     setRosterLoading(true);
     try {
       const students = await adminService.attendance.roster(p.classId);
       setRoster(students);
       setEntries(Object.fromEntries(students.map((s) => [s.id, 'present' as AttendanceStatus])));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load the roster');
+      toast.error('Could not load the roster', err instanceof Error ? err.message : undefined);
       setRoster([]);
     } finally {
       setRosterLoading(false);
@@ -207,7 +205,6 @@ function MarkAttendanceTab() {
   async function handleSubmit() {
     if (!selected) return;
     setSaving(true);
-    setError(undefined);
     try {
       await adminService.attendance.saveRecord({
         classId: selected.classId,
@@ -215,9 +212,9 @@ function MarkAttendanceTab() {
         period: periodNumber,
         entries: roster.map((s) => ({ studentId: s.id, status: entries[s.id] ?? 'present' })),
       });
-      setSuccessMsg(`Attendance saved for ${roster.length} students`);
+      toast.success('Attendance saved', `${roster.length} students`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save attendance');
+      toast.error('Could not save attendance', err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -259,17 +256,6 @@ function MarkAttendanceTab() {
             </div>
             <Button label="Mark all present" variant="outline" size="sm" onClick={markAllPresent} />
           </div>
-
-          {successMsg && (
-            <div className="mb-3">
-              <Banner tone="success" title={successMsg} />
-            </div>
-          )}
-          {error && (
-            <div className="mb-3">
-              <Banner tone="danger" title={error} />
-            </div>
-          )}
 
           {rosterLoading ? (
             <Loading />

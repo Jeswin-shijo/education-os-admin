@@ -4,6 +4,7 @@ import * as examService from '../../services/examService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { ExamResult } from '../../data/types';
 import {
   PageHeader,
@@ -53,8 +54,8 @@ export function ResultsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -131,10 +132,10 @@ export function ResultsPage() {
       };
       if (editing) {
         await examService.results.update(editing.id, payload);
-        setSuccessMsg(`Updated result for ${payload.studentName ?? payload.studentId}`);
+        toast.success('Result updated', payload.studentName ?? payload.studentId);
       } else {
         await examService.results.create(payload);
-        setSuccessMsg(`Added result for ${payload.studentName ?? payload.studentId}`);
+        toast.success('Result added', payload.studentName ?? payload.studentId);
       }
       setModalOpen(false);
       reload();
@@ -176,12 +177,6 @@ export function ResultsPage() {
         subtitle={rows ? `${rows.length} results` : undefined}
         action={<Button label="Add result" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />

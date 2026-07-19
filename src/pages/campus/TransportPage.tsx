@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { BusLiveStatus, BusRoute, BusStop } from '../../data/types';
 import {
   PageHeader,
@@ -26,7 +27,7 @@ const emptyLiveStatusForm = { routeId: '', currentStop: '', nextStop: '', etaMin
 
 export function TransportPage() {
   const [tab, setTab] = useState<Tab>('routes');
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const { data: routes, loading: routesLoading, reload: reloadRoutes } = useAsync(() => adminService.transport.routes.list(), []);
   const { data: stops, loading: stopsLoading, reload: reloadStops } = useAsync(() => adminService.transport.stops.list(), []);
@@ -78,7 +79,7 @@ export function TransportPage() {
           driver: routeForm.driver,
           driverPhone: routeForm.driverPhone,
         });
-        setSuccessMsg(`Updated route "${routeForm.name}"`);
+        toast.success('Route updated', routeForm.name);
       } else {
         await adminService.transport.routes.create({
           name: routeForm.name,
@@ -86,7 +87,7 @@ export function TransportPage() {
           driver: routeForm.driver,
           driverPhone: routeForm.driverPhone,
         });
-        setSuccessMsg(`Added route "${routeForm.name}"`);
+        toast.success('Route added', routeForm.name);
       }
       setRouteModalOpen(false);
       reloadRoutes();
@@ -126,7 +127,7 @@ export function TransportPage() {
         time: stopForm.time,
         order: Number(stopForm.order) || 0,
       });
-      setSuccessMsg(`Added stop "${stopForm.name}"`);
+      toast.success('Stop added', stopForm.name);
       setStopModalOpen(false);
       reloadStops();
     } catch (err) {
@@ -177,7 +178,7 @@ export function TransportPage() {
         etaMins: Number(liveStatusForm.etaMins) || 0,
         occupancy: Number(liveStatusForm.occupancy) || 0,
       });
-      setSuccessMsg(`Updated live status for ${routeName(liveStatusForm.routeId)}`);
+      toast.success('Live status updated', routeName(liveStatusForm.routeId));
       setLiveStatusModalOpen(false);
       reloadLiveStatus();
     } catch (err) {
@@ -255,12 +256,6 @@ export function TransportPage() {
           </div>
         }
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {tab === 'routes' && (
         <div>

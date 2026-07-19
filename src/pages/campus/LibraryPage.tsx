@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import { toLocalISODate } from '../../lib/date';
 import type { Book, BookLoan } from '../../data/types';
 import {
@@ -49,9 +50,8 @@ function BooksTab() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   function openCreate() {
     setEditing(null);
@@ -85,10 +85,10 @@ function BooksTab() {
       const payload = { title: form.title, author: form.author, category: form.category, copies: Number(form.copies) || 0, available: Number(form.available) || 0 };
       if (editing) {
         await adminService.library.update(editing.id, payload);
-        setSuccessMsg(`Updated "${payload.title}"`);
+        toast.success('Book updated', payload.title);
       } else {
         await adminService.library.create(payload);
-        setSuccessMsg(`Added "${payload.title}"`);
+        toast.success('Book added', payload.title);
       }
       setModalOpen(false);
       reload();
@@ -101,14 +101,16 @@ function BooksTab() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.title;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.library.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Book removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove book');
+      setDeleteTarget(null);
+      toast.error('Could not remove book', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -147,11 +149,6 @@ function BooksTab() {
 
   return (
     <div>
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
       <div className="mb-4 flex items-center justify-between gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by title, author, category…" />
         <Button label="Add book" icon="plus" onClick={openCreate} />
@@ -187,15 +184,11 @@ function BooksTab() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove book"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );
@@ -219,9 +212,9 @@ function LoansTab() {
   const [dueOn, setDueOn] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const [returningId, setReturningId] = useState<string | null>(null);
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   const bookOptions = (books ?? []).map((b) => ({ label: b.title, value: b.id, sub: b.author }));
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
@@ -267,7 +260,7 @@ function LoansTab() {
         issuedOn,
         dueOn,
       });
-      setSuccessMsg(`Issued "${book?.title ?? 'book'}" to ${student?.name ?? 'student'}`);
+      toast.success('Book issued', `${book?.title ?? 'book'} to ${student?.name ?? 'student'}`);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -281,10 +274,10 @@ function LoansTab() {
     setReturningId(loan.id);
     try {
       await adminService.library.loans.returnBook(loan.id, toLocalISODate(new Date()));
-      setSuccessMsg(`Marked "${loan.bookTitle}" as returned`);
+      toast.success('Book returned', loan.bookTitle);
       reload();
-    } catch {
-      setSuccessMsg(undefined);
+    } catch (err) {
+      toast.error('Could not return book', err instanceof Error ? err.message : undefined);
     } finally {
       setReturningId(null);
     }
@@ -321,11 +314,6 @@ function LoansTab() {
 
   return (
     <div>
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="text-body text-ink-muted">{loans ? `${loans.length} loans` : ''}</div>
         <Button label="Issue book" icon="plus" onClick={openIssue} />

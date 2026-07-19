@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as placementService from '../../services/placementService';
 import { useAsync } from '../../hooks/useAsync';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { PlacementApplication, PlacementOpening } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -51,8 +52,8 @@ export function PlacementsPage() {
   const [form, setForm] = useState(emptyOpeningForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -93,7 +94,7 @@ export function PlacementsPage() {
         logoColor: '#13327F',
         isActive: form.active === 'yes',
       });
-      setSuccessMsg(`Added opening "${form.role}" at ${form.company}`);
+      toast.success('Opening added', `${form.role} at ${form.company}`);
       setModalOpen(false);
       reloadOpenings();
     } catch (err) {
@@ -143,12 +144,6 @@ export function PlacementsPage() {
   return (
     <div>
       <PageHeader title="Placements" subtitle="Company openings and student applications" action={<Button label="Add opening" icon="plus" onClick={openCreate} />} />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-6 flex flex-wrap gap-3">
         {hasStats ? (

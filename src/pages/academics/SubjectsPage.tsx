@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import { CORE_SUBJECT_IDS } from '../../data/seed';
 import type { Subject } from '../../data/types';
 import {
@@ -57,9 +58,8 @@ export function SubjectsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
   const departmentName = (id: string) => departments?.find((d) => d.id === id)?.name ?? '—';
@@ -173,10 +173,10 @@ export function SubjectsPage() {
       };
       if (editing) {
         await adminService.subjects.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Subject updated', payload.name);
       } else {
         await adminService.subjects.create(payload);
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Subject added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -189,14 +189,16 @@ export function SubjectsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.subjects.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Subject removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove subject');
+      setDeleteTarget(null);
+      toast.error('Could not remove subject', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -251,12 +253,6 @@ export function SubjectsPage() {
         subtitle={rows ? `${rows.length} subjects` : undefined}
         action={<Button label="Add subject" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-4 flex gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by name, code, faculty…" />
@@ -346,15 +342,11 @@ export function SubjectsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove subject"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

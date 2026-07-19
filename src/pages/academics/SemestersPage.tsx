@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Semester } from '../../data/types';
 import {
   PageHeader,
@@ -33,9 +34,8 @@ export function SemestersPage() {
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   function openCreate() {
     setForm({ programId: programs?.[0]?.id ?? '', number: '1' });
@@ -53,7 +53,7 @@ export function SemestersPage() {
     setFormError(undefined);
     try {
       await adminService.semesters.create({ programId: form.programId, number: Number(form.number) });
-      setSuccessMsg(`Added semester ${form.number}`);
+      toast.success('Semester added', `Semester ${form.number}`);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -65,14 +65,16 @@ export function SemestersPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.number;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.semesters.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Semester removed', `Semester ${removed}`);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove semester');
+      setDeleteTarget(null);
+      toast.error('Could not remove semester', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -100,12 +102,6 @@ export function SemestersPage() {
         subtitle={rows ? `${rows.length} semesters` : undefined}
         action={<Button label="Add semester" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -144,15 +140,11 @@ export function SemestersPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove semester"
         message={`Remove Semester ${deleteTarget?.number}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as eventService from '../../services/eventService';
 import { useAsync } from '../../hooks/useAsync';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { EventItem } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -48,8 +49,8 @@ export function EventsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -57,7 +58,6 @@ export function EventsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<EventItem | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
 
   function openCreate() {
@@ -90,7 +90,7 @@ export function EventsPage() {
         category: form.category,
         description: form.description || undefined,
       });
-      setSuccessMsg(`Added event "${form.title}"`);
+      toast.success('Event created', form.title);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -102,14 +102,16 @@ export function EventsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.title;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await eventService.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Event removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove event');
+      setDeleteTarget(null);
+      toast.error('Could not remove event', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -149,12 +151,6 @@ export function EventsPage() {
         action={<Button label="Add event" icon="plus" onClick={openCreate} />}
       />
 
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
-
       {loading ? (
         <Loading />
       ) : !rows || rows.length === 0 ? (
@@ -190,15 +186,11 @@ export function EventsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove event"
         message={`Remove ${deleteTarget?.title}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

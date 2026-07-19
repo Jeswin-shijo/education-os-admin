@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import { groupBy, keyBy } from '../../lib';
 import type { ClassSession, Weekday, Shift, SessionStatus } from '../../data/types';
 import {
@@ -100,9 +101,8 @@ export function TimetablePage() {
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<ClassSession | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   // Option lists, derived from the current cascade selections.
   const facultyOptions = (facultyCandidates ?? []).map((c) => ({ label: c.fullName, value: c.id }));
@@ -226,10 +226,10 @@ export function TimetablePage() {
       };
       if (editing) {
         await adminService.timetable.update(editing.id, payload);
-        setSuccessMsg('Updated session');
+        toast.success('Session updated');
       } else {
         await adminService.timetable.create(payload);
-        setSuccessMsg('Added session');
+        toast.success('Session added');
       }
       setModalOpen(false);
       reload();
@@ -243,13 +243,14 @@ export function TimetablePage() {
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.timetable.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Session removed');
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove session');
+      setDeleteTarget(null);
+      toast.error('Could not remove session', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -273,12 +274,6 @@ export function TimetablePage() {
           options={[{ label: 'All faculty', value: '' }, ...facultyOptions]}
         />
       </div>
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -454,15 +449,11 @@ export function TimetablePage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove session"
         message="Remove this session from the timetable? This cannot be undone."
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

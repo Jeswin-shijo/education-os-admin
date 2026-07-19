@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Program } from '../../data/types';
 import {
   PageHeader,
@@ -46,9 +47,8 @@ export function ProgramsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
   const departmentName = (id: string) => departments?.find((d) => d.id === id)?.name ?? '—';
@@ -99,10 +99,10 @@ export function ProgramsPage() {
       };
       if (editing) {
         await adminService.programs.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Program updated', payload.name);
       } else {
         await adminService.programs.create(payload);
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Program added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -115,14 +115,16 @@ export function ProgramsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.programs.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Program removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove program');
+      setDeleteTarget(null);
+      toast.error('Could not remove program', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -154,12 +156,6 @@ export function ProgramsPage() {
         subtitle={rows ? `${rows.length} programs` : undefined}
         action={<Button label="Add program" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -208,15 +204,11 @@ export function ProgramsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove program"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

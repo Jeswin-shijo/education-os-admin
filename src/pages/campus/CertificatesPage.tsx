@@ -4,6 +4,7 @@ import * as certificateService from '../../services/certificateService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Certificate } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -50,8 +51,8 @@ export function CertificatesPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -93,7 +94,7 @@ export function CertificatesPage() {
         kind: form.kind,
         url: form.url || undefined,
       });
-      setSuccessMsg(`Issued "${form.title}" to ${student.name}`);
+      toast.success('Certificate issued', `${form.title} · ${student.name}`);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -118,12 +119,6 @@ export function CertificatesPage() {
         subtitle={rows ? `${rows.length} certificates` : undefined}
         action={<Button label="Issue certificate" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />

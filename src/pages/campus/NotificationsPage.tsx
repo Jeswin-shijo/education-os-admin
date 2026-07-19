@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { NotificationItem, Role } from '../../data/types';
 import { formatRelative } from '../../lib';
 import {
@@ -66,8 +67,8 @@ export function NotificationsPage() {
   const [form, setForm] = useState(emptyForm);
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -101,7 +102,7 @@ export function NotificationsPage() {
           body: form.body,
           category: form.category,
         });
-        setSuccessMsg(`Sent "${form.title}" to ${recipient?.name ?? 'recipient'}`);
+        toast.success('Notification sent', `"${form.title}" to ${recipient?.name ?? 'recipient'}`);
       } else {
         await adminService.notifications.broadcast({
           title: form.title,
@@ -109,7 +110,7 @@ export function NotificationsPage() {
           category: form.category,
           role: form.role || undefined,
         });
-        setSuccessMsg(`Broadcast "${form.title}" sent to ${form.role || 'everyone'}`);
+        toast.success('Broadcast sent', `"${form.title}" to ${form.role || 'everyone'}`);
       }
       setForm(emptyForm);
       reload();
@@ -134,12 +135,6 @@ export function NotificationsPage() {
   return (
     <div>
       <PageHeader title="Notifications" subtitle="Send direct messages or broadcast announcements" />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <Card className="mb-6">
         <div className="flex flex-col gap-4">

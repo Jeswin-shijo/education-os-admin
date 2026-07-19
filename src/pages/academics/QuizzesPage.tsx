@@ -4,6 +4,7 @@ import * as quizService from '../../services/quizService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Quiz, QuizQuestion } from '../../data/types';
 import {
   PageHeader,
@@ -59,9 +60,8 @@ export function QuizzesPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Quiz | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
 
@@ -121,7 +121,7 @@ export function QuizzesPage() {
     setFormError(undefined);
     try {
       const quiz = await quizService.create({ subjectId: form.subjectId, title: form.title, questions: cleaned });
-      setSuccessMsg(`Created quiz "${quiz.title}" with ${quiz.questions.length} questions`);
+      toast.success('Quiz created', quiz.title);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -133,14 +133,16 @@ export function QuizzesPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.title;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await quizService.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Quiz removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove quiz');
+      setDeleteTarget(null);
+      toast.error('Could not remove quiz', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -169,12 +171,6 @@ export function QuizzesPage() {
         subtitle={rows ? `${rows.length} quizzes` : undefined}
         action={<Button label="Create quiz" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -264,15 +260,11 @@ export function QuizzesPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove quiz"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

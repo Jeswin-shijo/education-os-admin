@@ -4,6 +4,7 @@ import * as materialService from '../../services/materialService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Material, MaterialKind } from '../../data/types';
 import { formatRelative } from '../../lib';
 import {
@@ -106,9 +107,8 @@ export function MaterialsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
   const filterOptions = [{ label: 'All subjects', value: ALL_SUBJECTS }, ...subjectOptions];
@@ -149,7 +149,7 @@ export function MaterialsPage() {
         fileName,
       };
       await materialService.upload(payload);
-      setSuccessMsg(`Uploaded "${payload.title}"`);
+      toast.success('Material uploaded', payload.title);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -161,14 +161,16 @@ export function MaterialsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.title;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await materialService.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Material removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove material');
+      setDeleteTarget(null);
+      toast.error('Could not remove material', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -199,12 +201,6 @@ export function MaterialsPage() {
         subtitle={rows ? `${rows.length} materials` : undefined}
         action={<Button label="Upload material" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-4 max-w-xs">
         <Select label="Filter by subject" value={filterSubjectId} onChange={setFilterSubjectId} options={filterOptions} />
@@ -272,15 +268,11 @@ export function MaterialsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove material"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

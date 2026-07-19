@@ -1,5 +1,6 @@
 import * as leaveService from '../../services/leaveService';
 import { useAsync } from '../../hooks/useAsync';
+import { useToast } from '../../state/ToastContext';
 import type { LeaveRequest } from '../../data/types';
 import { formatDate } from '../../lib';
 import { PageHeader, Table, type Column, Button, Badge, StatusPill, Loading, EmptyState } from '../../components';
@@ -20,10 +21,16 @@ const typeTone: Record<LeaveRequest['type'], 'create' | 'update' | 'delete' | 'b
 
 export function LeavePage() {
   const { data: rows, loading, reload } = useAsync(() => leaveService.list(), []);
+  const toast = useToast();
 
   async function handleDecision(leave: LeaveRequest, status: 'approved' | 'rejected') {
-    await leaveService.updateStatus(leave.id, status);
-    reload();
+    try {
+      await leaveService.updateStatus(leave.id, status);
+      reload();
+      toast.success(status === 'approved' ? 'Leave approved' : 'Leave rejected', leave.studentName || undefined);
+    } catch (err) {
+      toast.error('Could not update leave request', err instanceof Error ? err.message : undefined);
+    }
   }
 
   const columns: Column<LeaveRequest>[] = [

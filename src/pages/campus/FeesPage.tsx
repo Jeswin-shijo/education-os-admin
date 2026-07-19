@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { FeeInvoice, PaymentMethod } from '../../data/types';
 import { formatINR, formatDate } from '../../lib';
 import {
@@ -51,7 +52,6 @@ export function FeesPage() {
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [successMsg, setSuccessMsg] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [paymentTarget, setPaymentTarget] = useState<FeeInvoice | null>(null);
@@ -59,6 +59,7 @@ export function FeesPage() {
   const [paymentReference, setPaymentReference] = useState('');
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string>();
+  const toast = useToast();
 
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
 
@@ -104,7 +105,7 @@ export function FeesPage() {
           dueDate: new Date(l.dueDate).toISOString(),
         })),
       );
-      setSuccessMsg(`Added ${lines.length} invoice${lines.length > 1 ? 's' : ''} for ${student.name}`);
+      toast.success('Invoices added', `${lines.length} invoice${lines.length > 1 ? 's' : ''} for ${student.name}`);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -123,12 +124,14 @@ export function FeesPage() {
 
   async function handleRecordPayment() {
     if (!paymentTarget) return;
+    const invoice = paymentTarget;
     setPaying(true);
     setPaymentError(undefined);
     try {
-      await adminService.fees.recordPayment(paymentTarget.id, paymentTarget.amount, paymentMethod, paymentReference);
+      await adminService.fees.recordPayment(invoice.id, invoice.amount, paymentMethod, paymentReference);
       setPaymentTarget(null);
       reload();
+      toast.success('Payment received', `${formatINR(invoice.amount)} from ${invoice.studentName}`);
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : 'Could not record payment');
     } finally {
@@ -175,12 +178,6 @@ export function FeesPage() {
         subtitle={rows ? `${rows.length} invoices` : undefined}
         action={<Button label="Add invoice" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-4 flex gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by student, title, term…" />

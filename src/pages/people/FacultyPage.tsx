@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import { isEmail } from '../../lib/validation';
 import type { FacultyMember } from '../../data/types';
 import {
@@ -53,9 +54,8 @@ export function FacultyPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<FacultyMember | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   function openCreate() {
     setEditing(null);
@@ -110,10 +110,10 @@ export function FacultyPage() {
       };
       if (editing) {
         await adminService.faculty.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Faculty updated', payload.name);
       } else {
         await adminService.faculty.create(payload);
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Faculty added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -126,14 +126,16 @@ export function FacultyPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.faculty.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Faculty removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove faculty member');
+      setDeleteTarget(null);
+      toast.error('Could not remove faculty member', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -176,12 +178,6 @@ export function FacultyPage() {
         subtitle={rows ? `${rows.length} faculty members` : undefined}
         action={<Button label="Add faculty" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-4 flex gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by name, email, department…" />
@@ -245,15 +241,11 @@ export function FacultyPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove faculty"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

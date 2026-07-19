@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminService } from '../../services';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
+import { useToast } from '../../state/ToastContext';
 import type { PlatformUser, Role } from '../../data/types';
 import {
   PageHeader,
@@ -11,7 +12,6 @@ import {
   Select,
   StatusPill,
   Button,
-  Banner,
   Loading,
   EmptyState,
   Pagination,
@@ -31,17 +31,17 @@ export function UsersRolesPage() {
     [q, roleFilter],
   );
 
-  const [actionError, setActionError] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
+  const toast = useToast();
 
   async function handleRoleChange(user: PlatformUser, role: Role) {
     setBusyId(user.id);
     try {
       await adminService.users.updateRole(user.id, role);
-      setActionError(undefined);
       reload();
+      toast.success('Role updated', user.name);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not change role');
+      toast.error('Could not change role', err instanceof Error ? err.message : undefined);
     } finally {
       setBusyId(undefined);
     }
@@ -49,12 +49,13 @@ export function UsersRolesPage() {
 
   async function handleToggleActive(user: PlatformUser) {
     setBusyId(user.id);
+    const nowActive = !user.active;
     try {
-      await adminService.users.setActive(user.id, !user.active);
-      setActionError(undefined);
+      await adminService.users.setActive(user.id, nowActive);
       reload();
+      toast.success(nowActive ? 'User activated' : 'User deactivated', user.name);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not update user status');
+      toast.error('Could not update user status', err instanceof Error ? err.message : undefined);
     } finally {
       setBusyId(undefined);
     }
@@ -113,12 +114,6 @@ export function UsersRolesPage() {
   return (
     <div>
       <PageHeader title="Users & Roles" subtitle={rows ? `${rows.length} users` : undefined} />
-
-      {actionError && (
-        <div className="mb-4">
-          <Banner tone="danger" title="Can't change this user" message={actionError} />
-        </div>
-      )}
 
       <div className="mb-4 flex gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by name, email…" />

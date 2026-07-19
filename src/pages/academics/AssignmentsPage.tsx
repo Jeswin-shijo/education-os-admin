@@ -4,6 +4,7 @@ import * as assignmentService from '../../services/assignmentService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Assignment, AssignmentStatus } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -54,9 +55,8 @@ export function AssignmentsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
 
@@ -98,7 +98,7 @@ export function AssignmentsPage() {
         maxMarks: Number(form.maxMarks) || 0,
       };
       await assignmentService.create(payload);
-      setSuccessMsg(`Added assignment "${payload.title}"`);
+      toast.success('Assignment added', payload.title);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -110,14 +110,16 @@ export function AssignmentsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.title;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await assignmentService.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Assignment removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove assignment');
+      setDeleteTarget(null);
+      toast.error('Could not remove assignment', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -148,12 +150,6 @@ export function AssignmentsPage() {
         subtitle={rows ? `${rows.length} assignments` : undefined}
         action={<Button label="Add assignment" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -202,15 +198,11 @@ export function AssignmentsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove assignment"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

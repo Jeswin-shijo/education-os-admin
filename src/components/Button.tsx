@@ -28,6 +28,13 @@ const sizeClasses: Record<Size, string> = {
   md: 'text-body px-4 py-2.5 gap-2',
 };
 
+// Row-action ghost buttons are colour-coded by their icon: edit = orange, delete = red.
+// (edit/trash icons are only ever used on these row actions.)
+const ghostIconTone: Partial<Record<IconName, string>> = {
+  edit: 'bg-transparent text-warning hover:bg-warning-soft disabled:opacity-50',
+  trash: 'bg-transparent text-danger hover:bg-danger-soft disabled:opacity-50',
+};
+
 export function Button({
   label,
   variant = 'primary',
@@ -40,11 +47,13 @@ export function Button({
   disabled,
   ...rest
 }: Props) {
+  const base =
+    variant === 'ghost' && icon && ghostIconTone[icon] ? ghostIconTone[icon]! : variantClasses[variant];
   return (
     <button
       className={cn(
         'inline-flex items-center justify-center rounded-md font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed',
-        variantClasses[variant],
+        base,
         sizeClasses[size],
         full && 'w-full',
         className,

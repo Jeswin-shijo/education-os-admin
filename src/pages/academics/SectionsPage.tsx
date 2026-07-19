@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Section, Shift } from '../../data/types';
 
 const SHIFT_OPTIONS: { label: string; value: Shift }[] = [
@@ -44,9 +45,8 @@ export function SectionsPage() {
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
 
   const [deleteTarget, setDeleteTarget] = useState<Section | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   function openCreate() {
     setForm({ semesterId: semesters?.[0]?.id ?? '', name: 'A', shift: 'Morning' });
@@ -69,7 +69,7 @@ export function SectionsPage() {
     setFormError(undefined);
     try {
       await adminService.sections.create({ semesterId: form.semesterId, name: form.name.trim().toUpperCase(), shift: form.shift });
-      setSuccessMsg(`Added section ${form.name}`);
+      toast.success('Section added', `Section ${form.name}`);
       setModalOpen(false);
       reload();
     } catch (err) {
@@ -81,14 +81,16 @@ export function SectionsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.sections.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Section removed', `Section ${removed}`);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove section');
+      setDeleteTarget(null);
+      toast.error('Could not remove section', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -117,12 +119,6 @@ export function SectionsPage() {
         subtitle={rows ? `${rows.length} sections` : undefined}
         action={<Button label="Add section" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -162,15 +158,11 @@ export function SectionsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove section"
         message={`Remove Section ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

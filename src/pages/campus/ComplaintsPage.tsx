@@ -1,5 +1,6 @@
 import * as complaintService from '../../services/complaintService';
 import { useAsync } from '../../hooks/useAsync';
+import { useToast } from '../../state/ToastContext';
 import type { Complaint } from '../../data/types';
 import { formatDate } from '../../lib';
 import { PageHeader, Table, type Column, Select, StatusPill, StatCard, Loading, EmptyState } from '../../components';
@@ -14,14 +15,20 @@ const statusTone: Record<Complaint['status'], 'success' | 'warning' | 'danger' |
 
 export function ComplaintsPage() {
   const { data: rows, loading, reload } = useAsync(() => complaintService.list(), []);
+  const toast = useToast();
 
   const openCount = rows?.filter((c) => c.status === 'open').length ?? 0;
   const inProgressCount = rows?.filter((c) => c.status === 'in_progress').length ?? 0;
   const resolvedCount = rows?.filter((c) => c.status === 'resolved').length ?? 0;
 
   async function handleStatusChange(complaint: Complaint, status: Complaint['status']) {
-    await complaintService.updateStatus(complaint.id, status);
-    reload();
+    try {
+      await complaintService.updateStatus(complaint.id, status);
+      reload();
+      toast.success('Complaint updated', complaint.subject);
+    } catch (err) {
+      toast.error('Could not update complaint', err instanceof Error ? err.message : undefined);
+    }
   }
 
   const columns: Column<Complaint>[] = [

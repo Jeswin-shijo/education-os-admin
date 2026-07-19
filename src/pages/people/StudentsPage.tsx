@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Section, Semester, Student } from '../../data/types';
 import { isEmail } from '../../lib/validation';
 import { toLocalISODate } from '../../lib/date';
@@ -96,9 +97,8 @@ export function StudentsPage() {
   }, [form.name, form.dob, editing, passwordManual]);
 
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const departmentName = (id: string) => departments?.find((d) => d.id === id)?.code ?? '—';
   const programsForDept = (departmentId: string) => (allPrograms ?? []).filter((p) => p.departmentId === departmentId);
@@ -243,10 +243,10 @@ export function StudentsPage() {
       };
       if (editing) {
         await adminService.students.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Student updated', payload.name);
       } else {
         await adminService.students.create({ ...payload, password: form.password });
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Student added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -259,14 +259,16 @@ export function StudentsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await adminService.students.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Student removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove student');
+      setDeleteTarget(null);
+      toast.error('Could not remove student', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -309,12 +311,6 @@ export function StudentsPage() {
         subtitle={rows ? `${rows.length} students` : undefined}
         action={<Button label="Add student" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       <div className="mb-4 flex gap-3">
         <SearchBar value={q} onChangeText={setQ} placeholder="Search by name, roll no, email…" />
@@ -483,15 +479,11 @@ export function StudentsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove student"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );

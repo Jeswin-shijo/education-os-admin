@@ -3,6 +3,7 @@ import { adminService } from '../../services';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { HostelAllocation, HostelBlock, HostelRoom } from '../../data/types';
 import { formatINR } from '../../lib';
 import {
@@ -30,7 +31,7 @@ const emptyAllocationForm = { studentId: '', roomId: '', bed: '', messPlan: '', 
 
 export function HostelPage() {
   const [tab, setTab] = useState<Tab>('blocks');
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   // Full lists power cross-tab labels + the form dropdowns; the tables read from the
   // paginated hooks below. Blocks/rooms are referenced by the room & allocation forms,
@@ -77,7 +78,6 @@ export function HostelPage() {
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockFormError, setBlockFormError] = useState<string>();
   const [blockDeleteTarget, setBlockDeleteTarget] = useState<HostelBlock | null>(null);
-  const [blockDeleteError, setBlockDeleteError] = useState<string>();
   const [blockDeleting, setBlockDeleting] = useState(false);
   const blockErrors = useFieldErrors();
 
@@ -102,7 +102,7 @@ export function HostelPage() {
         warden: blockForm.warden,
         wardenPhone: blockForm.wardenPhone,
       });
-      setSuccessMsg(`Added block "${blockForm.name}"`);
+      toast.success('Block added', blockForm.name);
       setBlockModalOpen(false);
       reloadBlocks();
       reloadBlockList();
@@ -115,15 +115,17 @@ export function HostelPage() {
 
   async function handleDeleteBlock() {
     if (!blockDeleteTarget) return;
+    const removed = blockDeleteTarget.name;
     setBlockDeleting(true);
-    setBlockDeleteError(undefined);
     try {
       await adminService.hostel.blocks.remove(blockDeleteTarget.id);
       setBlockDeleteTarget(null);
       reloadBlocks();
       reloadBlockList();
+      toast.success('Block removed', removed);
     } catch (err) {
-      setBlockDeleteError(err instanceof Error ? err.message : 'Could not remove block');
+      setBlockDeleteTarget(null);
+      toast.error('Could not remove block', err instanceof Error ? err.message : undefined);
     } finally {
       setBlockDeleting(false);
     }
@@ -157,7 +159,7 @@ export function HostelPage() {
         roomNo: roomForm.roomNo,
         capacity: Number(roomForm.capacity) || 0,
       });
-      setSuccessMsg(`Added room ${roomForm.roomNo}`);
+      toast.success('Room added', roomForm.roomNo);
       setRoomModalOpen(false);
       reloadRooms();
       reloadRoomList();
@@ -174,7 +176,6 @@ export function HostelPage() {
   const [allocationSaving, setAllocationSaving] = useState(false);
   const [allocationFormError, setAllocationFormError] = useState<string>();
   const [allocationDeleteTarget, setAllocationDeleteTarget] = useState<HostelAllocation | null>(null);
-  const [allocationDeleteError, setAllocationDeleteError] = useState<string>();
   const [allocationDeleting, setAllocationDeleting] = useState(false);
   const allocErrors = useFieldErrors();
 
@@ -205,7 +206,7 @@ export function HostelPage() {
         messPlan: allocationForm.messPlan,
         fees: Number(allocationForm.fees) || 0,
       });
-      setSuccessMsg(`Allocated ${student.name} to a room`);
+      toast.success('Room allocated', student.name);
       setAllocationModalOpen(false);
       reloadAllocations();
     } catch (err) {
@@ -217,14 +218,16 @@ export function HostelPage() {
 
   async function handleDeleteAllocation() {
     if (!allocationDeleteTarget) return;
+    const removed = allocationDeleteTarget.studentName;
     setAllocationDeleting(true);
-    setAllocationDeleteError(undefined);
     try {
       await adminService.hostel.allocations.remove(allocationDeleteTarget.id);
       setAllocationDeleteTarget(null);
       reloadAllocations();
+      toast.success('Allocation removed', removed);
     } catch (err) {
-      setAllocationDeleteError(err instanceof Error ? err.message : 'Could not remove allocation');
+      setAllocationDeleteTarget(null);
+      toast.error('Could not remove allocation', err instanceof Error ? err.message : undefined);
     } finally {
       setAllocationDeleting(false);
     }
@@ -283,12 +286,6 @@ export function HostelPage() {
           </div>
         }
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {tab === 'blocks' && (
         <div>
@@ -364,15 +361,11 @@ export function HostelPage() {
 
       <ConfirmDialog
         open={!!blockDeleteTarget}
-        onClose={() => {
-          setBlockDeleteTarget(null);
-          setBlockDeleteError(undefined);
-        }}
+        onClose={() => setBlockDeleteTarget(null)}
         onConfirm={handleDeleteBlock}
         title="Remove block"
         message={`Remove ${blockDeleteTarget?.name}? This cannot be undone.`}
         loading={blockDeleting}
-        error={blockDeleteError}
       />
 
       <Modal open={roomModalOpen} onClose={() => setRoomModalOpen(false)} title="Add room">
@@ -431,15 +424,11 @@ export function HostelPage() {
 
       <ConfirmDialog
         open={!!allocationDeleteTarget}
-        onClose={() => {
-          setAllocationDeleteTarget(null);
-          setAllocationDeleteError(undefined);
-        }}
+        onClose={() => setAllocationDeleteTarget(null)}
         onConfirm={handleDeleteAllocation}
         title="Remove allocation"
         message={`Remove allocation for ${allocationDeleteTarget?.studentName}? This cannot be undone.`}
         loading={allocationDeleting}
-        error={allocationDeleteError}
       />
     </div>
   );

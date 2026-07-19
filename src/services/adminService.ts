@@ -224,6 +224,30 @@ function studentToApiFields(input: Omit<Student, 'id'>): Record<string, string> 
   };
 }
 
+/** Map a partial Student patch (camelCase) to the backend's snake_case writable fields
+ *  for `PATCH /students/{id}`. Only includes keys present in the patch; normalizes the
+ *  gender label ("Male") to the backend choice value ("male"). */
+function studentPatchToApiFields(patch: Partial<Omit<Student, 'id'>>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (patch.name !== undefined) out.full_name = patch.name;
+  if (patch.rollNo !== undefined) out.roll_no = patch.rollNo;
+  if (patch.admissionNo !== undefined) out.admission_no = patch.admissionNo;
+  if (patch.email !== undefined) out.email = patch.email;
+  if (patch.phone !== undefined) out.phone = patch.phone;
+  if (patch.departmentId !== undefined) out.department = patch.departmentId;
+  if (patch.programId !== undefined) out.program = patch.programId;
+  if (patch.semesterId !== undefined) out.semester = patch.semesterId;
+  if (patch.sectionId !== undefined) out.section = patch.sectionId;
+  if (patch.gender !== undefined) out.gender = GENDER_API[patch.gender] ?? String(patch.gender).toLowerCase();
+  if (patch.dob !== undefined) out.dob = patch.dob;
+  if (patch.bloodGroup !== undefined) out.blood_group = patch.bloodGroup;
+  if (patch.mentorName !== undefined) out.mentor_name = patch.mentorName;
+  if (patch.address !== undefined) out.address = patch.address ?? '';
+  if (patch.cgpa !== undefined) out.cgpa = patch.cgpa;
+  if (patch.avatarColor !== undefined) out.avatar_color = patch.avatarColor;
+  return out;
+}
+
 export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const res = await fetch(dataUrl);
   return res.blob();
@@ -294,9 +318,9 @@ export const students = {
         return updated;
       },
       async () => {
-        await http.patch(`/api/v1/students/${id}/`, patch);
-        const rows = await http.get<Student[]>('/api/v1/students/');
-        const updated = rows.find((s) => s.id === id);
+        await http.patch(`/api/v1/students/${id}/`, studentPatchToApiFields(patch));
+        const rows = await http.get<StudentApi[]>('/api/v1/students/');
+        const updated = rows.map(mapStudentFromApi).find((s) => s.id === id);
         if (!updated) throw new Error('Student not found after update');
         await logAction('update', 'Student', `Updated student ${updated.name}`);
         return updated;

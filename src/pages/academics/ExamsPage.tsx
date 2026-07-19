@@ -4,6 +4,7 @@ import * as examService from '../../services/examService';
 import { useAsync } from '../../hooks/useAsync';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useFieldErrors } from '../../hooks/useFieldErrors';
+import { useToast } from '../../state/ToastContext';
 import type { Exam, ExamType } from '../../data/types';
 import { formatDate } from '../../lib';
 import {
@@ -59,9 +60,8 @@ export function ExamsPage() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<Exam | null>(null);
-  const [deleteError, setDeleteError] = useState<string>();
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string>();
+  const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
 
@@ -122,10 +122,10 @@ export function ExamsPage() {
       };
       if (editing) {
         await examService.exams.update(editing.id, payload);
-        setSuccessMsg(`Updated ${payload.name}`);
+        toast.success('Exam updated', payload.name);
       } else {
         await examService.exams.create(payload);
-        setSuccessMsg(`Added ${payload.name}`);
+        toast.success('Exam added', payload.name);
       }
       setModalOpen(false);
       reload();
@@ -138,14 +138,16 @@ export function ExamsPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
+    const removed = deleteTarget.name;
     setDeleting(true);
-    setDeleteError(undefined);
     try {
       await examService.exams.remove(deleteTarget.id);
       setDeleteTarget(null);
       reload();
+      toast.success('Exam removed', removed);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not remove exam');
+      setDeleteTarget(null);
+      toast.error('Could not remove exam', err instanceof Error ? err.message : undefined);
     } finally {
       setDeleting(false);
     }
@@ -182,12 +184,6 @@ export function ExamsPage() {
         subtitle={rows ? `${rows.length} exams` : undefined}
         action={<Button label="Add exam" icon="plus" onClick={openCreate} />}
       />
-
-      {successMsg && (
-        <div className="mb-4">
-          <Banner tone="success" title={successMsg} />
-        </div>
-      )}
 
       {loading ? (
         <Loading />
@@ -240,15 +236,11 @@ export function ExamsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={() => {
-          setDeleteTarget(null);
-          setDeleteError(undefined);
-        }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove exam"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
-        error={deleteError}
       />
     </div>
   );
