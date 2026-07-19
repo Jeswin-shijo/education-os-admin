@@ -17,6 +17,7 @@ import {
   TextField,
   Select,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -55,6 +56,7 @@ export function FacultyPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<FacultyMember | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<FacultyMember | null>(null);
   const toast = useToast();
 
   function openCreate() {
@@ -189,7 +191,7 @@ export function FacultyPage() {
         <EmptyState icon="people" title="No faculty found" actionLabel="Add faculty" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -246,6 +248,45 @@ export function FacultyPage() {
         title="Remove faculty"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Faculty details"
+        header={
+          detailTarget && (
+            <div className="flex items-center gap-3">
+              <Avatar name={detailTarget.name} size={48} color={detailTarget.avatarColor} uri={detailTarget.photoUrl} />
+              <div>
+                <div className="text-h3 text-ink">{detailTarget.name}</div>
+                <div className="text-small text-ink-muted">{detailTarget.designation}</div>
+              </div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Email', value: detailTarget.email },
+                { label: 'Phone', value: detailTarget.phone },
+                { label: 'Department', value: detailTarget.department },
+                { label: 'Designation', value: detailTarget.designation },
+                { label: 'Qualifications', value: detailTarget.qualifications, full: true },
+                { label: 'Experience', value: detailTarget.experience, full: true },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const f = detailTarget;
+          setDetailTarget(null);
+          if (f) openEdit(f);
+        }}
+        onDelete={() => {
+          const f = detailTarget;
+          setDetailTarget(null);
+          if (f) setDeleteTarget(f);
+        }}
       />
     </div>
   );

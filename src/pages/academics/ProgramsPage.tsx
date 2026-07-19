@@ -14,6 +14,7 @@ import {
   TextField,
   Select,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -48,6 +49,7 @@ export function ProgramsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Program | null>(null);
   const toast = useToast();
 
   const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
@@ -163,7 +165,7 @@ export function ProgramsPage() {
         <EmptyState icon="academics" title="No programs found" actionLabel="Add program" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -209,6 +211,33 @@ export function ProgramsPage() {
         title="Remove program"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Program details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Code', value: detailTarget.code },
+                { label: 'Name', value: detailTarget.name },
+                { label: 'Department', value: departmentName(detailTarget.departmentId) },
+                { label: 'Duration', value: `${detailTarget.durationYears} yrs` },
+                { label: 'Intake', value: detailTarget.intake },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const p = detailTarget;
+          setDetailTarget(null);
+          if (p) openEdit(p);
+        }}
+        onDelete={() => {
+          const p = detailTarget;
+          setDetailTarget(null);
+          if (p) setDeleteTarget(p);
+        }}
       />
     </div>
   );

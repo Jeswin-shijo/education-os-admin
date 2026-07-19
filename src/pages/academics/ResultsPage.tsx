@@ -16,6 +16,7 @@ import {
   Select,
   SearchableSelect,
   StatusPill,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -55,6 +56,7 @@ export function ResultsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const [detailTarget, setDetailTarget] = useState<ExamResult | null>(null);
   const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
@@ -184,7 +186,7 @@ export function ResultsPage() {
         <EmptyState icon="audit" title="No results found" actionLabel="Add result" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -230,6 +232,38 @@ export function ResultsPage() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Result details"
+        header={
+          detailTarget && (
+            <div>
+              <div className="text-h3 text-ink">{studentLabel(detailTarget.studentId, detailTarget.studentName)}</div>
+              <div className="text-small text-ink-muted">{subjectLabel(detailTarget.subjectId, detailTarget.subjectName)}</div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Student', value: studentLabel(detailTarget.studentId, detailTarget.studentName) },
+                { label: 'Subject', value: subjectLabel(detailTarget.subjectId, detailTarget.subjectName) },
+                { label: 'Exam', value: detailTarget.exam },
+                { label: 'Marks', value: `${detailTarget.marks} / ${detailTarget.maxMarks}` },
+                { label: 'Grade', value: <StatusPill status={gradeStatus(detailTarget.grade)} label={detailTarget.grade} /> },
+                { label: 'Grade Point', value: detailTarget.gradePoint },
+                { label: 'Credits', value: detailTarget.credits },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const r = detailTarget;
+          setDetailTarget(null);
+          if (r) openEdit(r);
+        }}
+      />
     </div>
   );
 }

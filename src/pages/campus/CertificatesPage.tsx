@@ -22,6 +22,7 @@ import {
   Loading,
   EmptyState,
   Pagination,
+  DetailModal,
 } from '../../components';
 
 const KINDS: Certificate['kind'][] = ['course', 'event', 'achievement'];
@@ -53,6 +54,8 @@ export function CertificatesPage() {
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
   const toast = useToast();
+
+  const [detailTarget, setDetailTarget] = useState<Certificate | null>(null);
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -126,7 +129,7 @@ export function CertificatesPage() {
         <EmptyState icon="academics" title="No certificates found" actionLabel="Issue certificate" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -163,6 +166,24 @@ export function CertificatesPage() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Certificate details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Student', value: detailTarget.studentName },
+                { label: 'Title', value: detailTarget.title },
+                { label: 'Issuer', value: detailTarget.issuer },
+                { label: 'Issued on', value: formatDate(detailTarget.issuedOn) },
+                { label: 'Kind', value: <Badge tone={kindTone[detailTarget.kind]} label={detailTarget.kind} /> },
+                { label: 'URL', value: detailTarget.url, full: true },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

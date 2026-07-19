@@ -13,6 +13,7 @@ import {
   Modal,
   Select,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -54,6 +55,7 @@ export function DepartmentsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Department | null>(null);
   const toast = useToast();
 
   function hodName(id?: string): string | undefined {
@@ -174,7 +176,7 @@ export function DepartmentsPage() {
         <EmptyState icon="campus" title="No departments found" actionLabel="Add department" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -223,6 +225,31 @@ export function DepartmentsPage() {
         title="Remove department"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Department details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Code', value: detailTarget.code },
+                { label: 'Name', value: detailTarget.name },
+                { label: 'HOD', value: hodName(detailTarget.hod) },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const d = detailTarget;
+          setDetailTarget(null);
+          if (d) openEdit(d);
+        }}
+        onDelete={() => {
+          const d = detailTarget;
+          setDetailTarget(null);
+          if (d) setDeleteTarget(d);
+        }}
       />
     </div>
   );

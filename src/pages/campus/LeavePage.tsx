@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import * as leaveService from '../../services/leaveService';
 import { useAsync } from '../../hooks/useAsync';
 import { useToast } from '../../state/ToastContext';
 import type { LeaveRequest } from '../../data/types';
 import { formatDate } from '../../lib';
-import { PageHeader, Table, type Column, Button, Badge, StatusPill, Loading, EmptyState } from '../../components';
+import { PageHeader, Table, type Column, Button, Badge, StatusPill, Loading, EmptyState, DetailModal } from '../../components';
 
 const statusTone: Record<LeaveRequest['status'], 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   pending: 'info',
@@ -22,6 +23,8 @@ const typeTone: Record<LeaveRequest['type'], 'create' | 'update' | 'delete' | 'b
 export function LeavePage() {
   const { data: rows, loading, reload } = useAsync(() => leaveService.list(), []);
   const toast = useToast();
+
+  const [detailTarget, setDetailTarget] = useState<LeaveRequest | null>(null);
 
   async function handleDecision(leave: LeaveRequest, status: 'approved' | 'rejected') {
     try {
@@ -70,8 +73,27 @@ export function LeavePage() {
       ) : !rows || rows.length === 0 ? (
         <EmptyState icon="student" title="No leave requests found" />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
       )}
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Leave request details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Student', value: detailTarget.studentName },
+                { label: 'Type', value: <Badge tone={typeTone[detailTarget.type]} label={detailTarget.type} /> },
+                { label: 'From', value: formatDate(detailTarget.fromDate) },
+                { label: 'To', value: formatDate(detailTarget.toDate) },
+                { label: 'Status', value: <StatusPill status={statusTone[detailTarget.status]} label={detailTarget.status} /> },
+                { label: 'Applied on', value: formatDate(detailTarget.appliedOn) },
+                { label: 'Reason', value: detailTarget.reason, full: true },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

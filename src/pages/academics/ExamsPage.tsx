@@ -19,6 +19,7 @@ import {
   TimePicker,
   StatusPill,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -61,6 +62,7 @@ export function ExamsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Exam | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Exam | null>(null);
   const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
@@ -191,7 +193,7 @@ export function ExamsPage() {
         <EmptyState icon="timetable" title="No exams found" actionLabel="Add exam" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -241,6 +243,44 @@ export function ExamsPage() {
         title="Remove exam"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Exam details"
+        header={
+          detailTarget && (
+            <div>
+              <div className="text-h3 text-ink">{detailTarget.name}</div>
+              <div className="text-small text-ink-muted">
+                {subjectLabel(detailTarget.subjectId, detailTarget.subjectCode, detailTarget.subjectName)}
+              </div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Subject', value: subjectLabel(detailTarget.subjectId, detailTarget.subjectCode, detailTarget.subjectName) },
+                { label: 'Date', value: formatDate(detailTarget.date) },
+                { label: 'Time', value: detailTarget.time },
+                { label: 'Room', value: detailTarget.room },
+                { label: 'Duration', value: `${detailTarget.durationMins} mins` },
+                { label: 'Type', value: <StatusPill status={typeStatus[detailTarget.type]} label={detailTarget.type} /> },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const r = detailTarget;
+          setDetailTarget(null);
+          if (r) openEdit(r);
+        }}
+        onDelete={() => {
+          const r = detailTarget;
+          setDetailTarget(null);
+          if (r) setDeleteTarget(r);
+        }}
       />
     </div>
   );

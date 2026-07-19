@@ -20,6 +20,7 @@ import {
   Select,
   DatePicker,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -98,6 +99,7 @@ export function StudentsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Student | null>(null);
   const toast = useToast();
 
   const departmentName = (id: string) => departments?.find((d) => d.id === id)?.code ?? '—';
@@ -322,7 +324,7 @@ export function StudentsPage() {
         <EmptyState icon="people" title="No students found" actionLabel="Add student" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -484,6 +486,51 @@ export function StudentsPage() {
         title="Remove student"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Student details"
+        header={
+          detailTarget && (
+            <div className="flex items-center gap-3">
+              <Avatar name={detailTarget.name} size={48} color={detailTarget.avatarColor} uri={detailTarget.avatarUrl} />
+              <div>
+                <div className="text-h3 text-ink">{detailTarget.name}</div>
+                <div className="text-small text-ink-muted">{detailTarget.rollNo}</div>
+              </div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Roll No', value: detailTarget.rollNo },
+                { label: 'Admission No', value: detailTarget.admissionNo },
+                { label: 'Email', value: detailTarget.email },
+                { label: 'Phone', value: detailTarget.phone },
+                { label: 'Gender', value: detailTarget.gender },
+                { label: 'Date of Birth', value: detailTarget.dob },
+                { label: 'Department', value: departmentName(detailTarget.departmentId) },
+                { label: 'Year', value: detailTarget.year },
+                { label: 'CGPA', value: detailTarget.cgpa.toFixed(2) },
+                { label: 'Blood Group', value: detailTarget.bloodGroup },
+                { label: 'Mentor', value: detailTarget.mentorName },
+                { label: 'Address', value: detailTarget.address, full: true },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const s = detailTarget;
+          setDetailTarget(null);
+          if (s) openEdit(s);
+        }}
+        onDelete={() => {
+          const s = detailTarget;
+          setDetailTarget(null);
+          if (s) setDeleteTarget(s);
+        }}
       />
     </div>
   );

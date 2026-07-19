@@ -18,6 +18,7 @@ import {
   SearchableSelect,
   DatePicker,
   StatusPill,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -59,6 +60,7 @@ export function FeesPage() {
   const [paymentReference, setPaymentReference] = useState('');
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string>();
+  const [detailTarget, setDetailTarget] = useState<FeeInvoice | null>(null);
   const toast = useToast();
 
   const studentOptions = (students ?? []).map((s) => ({ label: s.name, value: s.id, sub: s.rollNo }));
@@ -189,7 +191,7 @@ export function FeesPage() {
         <EmptyState icon="campus" title="No invoices found" actionLabel="Add invoice" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -260,6 +262,25 @@ export function FeesPage() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Invoice details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Student', value: detailTarget.studentName },
+                { label: 'Invoice', value: detailTarget.title },
+                { label: 'Term', value: detailTarget.term },
+                { label: 'Amount', value: formatINR(detailTarget.amount) },
+                { label: 'Due date', value: formatDate(detailTarget.dueDate) },
+                { label: 'Status', value: <StatusPill status={statusTone[detailTarget.status]} label={detailTarget.status} /> },
+                { label: 'Paid on', value: detailTarget.paidOn ? formatDate(detailTarget.paidOn) : null },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

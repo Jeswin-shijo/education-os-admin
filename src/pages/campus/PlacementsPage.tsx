@@ -19,6 +19,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  DetailModal,
 } from '../../components';
 
 const APPLICATION_STATUSES: PlacementApplication['status'][] = ['applied', 'shortlisted', 'selected', 'rejected'];
@@ -54,6 +55,9 @@ export function PlacementsPage() {
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
   const toast = useToast();
+
+  const [detailTarget, setDetailTarget] = useState<PlacementOpening | null>(null);
+  const [appDetailTarget, setAppDetailTarget] = useState<PlacementApplication | null>(null);
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -166,7 +170,7 @@ export function PlacementsPage() {
       ) : !openings || openings.length === 0 ? (
         <EmptyState icon="course" title="No openings found" actionLabel="Add opening" onAction={openCreate} />
       ) : (
-        <Table columns={openingColumns} rows={openings} />
+        <Table columns={openingColumns} rows={openings} onRowClick={setDetailTarget} />
       )}
 
       <h2 className="mb-3 mt-8 text-h3 text-ink">Applications</h2>
@@ -175,7 +179,7 @@ export function PlacementsPage() {
       ) : !applications || applications.length === 0 ? (
         <EmptyState icon="student" title="No applications found" />
       ) : (
-        <Table columns={applicationColumns} rows={applications} />
+        <Table columns={applicationColumns} rows={applications} onRowClick={setAppDetailTarget} />
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add opening" width={560}>
@@ -208,6 +212,47 @@ export function PlacementsPage() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Opening details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Company', value: detailTarget.company },
+                { label: 'Role', value: detailTarget.role },
+                { label: 'CTC', value: `${detailTarget.ctc}L` },
+                { label: 'Location', value: detailTarget.location },
+                { label: 'Last date', value: formatDate(detailTarget.lastDate) },
+                {
+                  label: 'Status',
+                  value: <StatusPill status={detailTarget.isActive ? 'success' : 'neutral'} label={detailTarget.isActive ? 'Active' : 'Closed'} />,
+                },
+                { label: 'Eligibility', value: detailTarget.eligibility, full: true },
+              ]
+            : []
+        }
+      />
+
+      <DetailModal
+        open={!!appDetailTarget}
+        onClose={() => setAppDetailTarget(null)}
+        title="Application details"
+        fields={
+          appDetailTarget
+            ? [
+                { label: 'Student', value: appDetailTarget.studentName },
+                { label: 'Company / Role', value: appDetailTarget.companyRole },
+                {
+                  label: 'Status',
+                  value: <StatusPill status={applicationStatusTone[appDetailTarget.status]} label={appDetailTarget.status} />,
+                },
+                { label: 'Applied on', value: formatDate(appDetailTarget.appliedOn) },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

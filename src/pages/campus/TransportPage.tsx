@@ -14,6 +14,7 @@ import {
   TimePicker,
   Select,
   Chip,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -45,6 +46,7 @@ export function TransportPage() {
   const [routeForm, setRouteForm] = useState(emptyRouteForm);
   const [routeSaving, setRouteSaving] = useState(false);
   const [routeFormError, setRouteFormError] = useState<string>();
+  const [routeDetailTarget, setRouteDetailTarget] = useState<BusRoute | null>(null);
   const routeErrors = useFieldErrors();
 
   function openCreateRoute() {
@@ -103,6 +105,7 @@ export function TransportPage() {
   const [stopForm, setStopForm] = useState(emptyStopForm);
   const [stopSaving, setStopSaving] = useState(false);
   const [stopFormError, setStopFormError] = useState<string>();
+  const [stopDetailTarget, setStopDetailTarget] = useState<BusStop | null>(null);
   const stopErrors = useFieldErrors();
 
   function openCreateStop() {
@@ -142,6 +145,7 @@ export function TransportPage() {
   const [liveStatusForm, setLiveStatusForm] = useState(emptyLiveStatusForm);
   const [liveStatusSaving, setLiveStatusSaving] = useState(false);
   const [liveStatusFormError, setLiveStatusFormError] = useState<string>();
+  const [liveDetailTarget, setLiveDetailTarget] = useState<BusLiveStatus | null>(null);
   const liveErrors = useFieldErrors();
 
   function openUpdateLiveStatus(existing?: BusLiveStatus) {
@@ -268,7 +272,7 @@ export function TransportPage() {
           ) : !routes || routes.length === 0 ? (
             <EmptyState icon="transport" title="No routes found" actionLabel="Add route" onAction={openCreateRoute} />
           ) : (
-            <Table columns={routeColumns} rows={routes} />
+            <Table columns={routeColumns} rows={routes} onRowClick={setRouteDetailTarget} />
           )}
         </div>
       )}
@@ -284,7 +288,7 @@ export function TransportPage() {
           ) : sortedStops.length === 0 ? (
             <EmptyState icon="transport" title="No stops found" actionLabel="Add stop" onAction={openCreateStop} />
           ) : (
-            <Table columns={stopColumns} rows={sortedStops} />
+            <Table columns={stopColumns} rows={sortedStops} onRowClick={setStopDetailTarget} />
           )}
         </div>
       )}
@@ -306,7 +310,7 @@ export function TransportPage() {
           ) : !liveStatuses || liveStatuses.length === 0 ? (
             <EmptyState icon="transport" title="No live status reported yet" actionLabel="Update status" onAction={() => openUpdateLiveStatus()} />
           ) : (
-            <Table columns={liveStatusColumns} rows={liveStatuses} />
+            <Table columns={liveStatusColumns} rows={liveStatuses} onRowClick={setLiveDetailTarget} />
           )}
         </div>
       )}
@@ -383,6 +387,65 @@ export function TransportPage() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!routeDetailTarget}
+        onClose={() => setRouteDetailTarget(null)}
+        title="Route details"
+        fields={
+          routeDetailTarget
+            ? [
+                { label: 'Route', value: routeDetailTarget.name },
+                { label: 'Number', value: routeDetailTarget.number },
+                { label: 'Driver', value: routeDetailTarget.driver },
+                { label: 'Driver phone', value: routeDetailTarget.driverPhone },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const r = routeDetailTarget;
+          setRouteDetailTarget(null);
+          if (r) openEditRoute(r);
+        }}
+      />
+
+      <DetailModal
+        open={!!stopDetailTarget}
+        onClose={() => setStopDetailTarget(null)}
+        title="Stop details"
+        fields={
+          stopDetailTarget
+            ? [
+                { label: 'Route', value: routeName(stopDetailTarget.routeId) },
+                { label: 'Stop', value: stopDetailTarget.name },
+                { label: 'Time', value: stopDetailTarget.time },
+                { label: 'Order', value: stopDetailTarget.order },
+              ]
+            : []
+        }
+      />
+
+      <DetailModal
+        open={!!liveDetailTarget}
+        onClose={() => setLiveDetailTarget(null)}
+        title="Live status details"
+        fields={
+          liveDetailTarget
+            ? [
+                { label: 'Route', value: routeName(liveDetailTarget.routeId) },
+                { label: 'Current stop', value: liveDetailTarget.currentStop },
+                { label: 'Next stop', value: liveDetailTarget.nextStop },
+                { label: 'ETA', value: `${liveDetailTarget.etaMins} min` },
+                { label: 'Occupancy', value: `${liveDetailTarget.occupancy}%` },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const s = liveDetailTarget;
+          setLiveDetailTarget(null);
+          if (s) openUpdateLiveStatus(s);
+        }}
+      />
     </div>
   );
 }

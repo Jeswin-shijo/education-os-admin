@@ -20,6 +20,7 @@ import {
   TextField,
   Select,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -46,6 +47,7 @@ export function SectionsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Section | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Section | null>(null);
   const toast = useToast();
 
   function openCreate() {
@@ -126,7 +128,7 @@ export function SectionsPage() {
         <EmptyState icon="academics" title="No sections found" actionLabel="Add section" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -163,6 +165,26 @@ export function SectionsPage() {
         title="Remove section"
         message={`Remove Section ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Section details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Semester', value: semesterLabel(detailTarget.semesterId) },
+                { label: 'Section', value: detailTarget.name },
+                { label: 'Shift', value: detailTarget.shift },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const s = detailTarget;
+          setDetailTarget(null);
+          if (s) setDeleteTarget(s);
+        }}
       />
     </div>
   );

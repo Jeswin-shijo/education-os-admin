@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import * as complaintService from '../../services/complaintService';
 import { useAsync } from '../../hooks/useAsync';
 import { useToast } from '../../state/ToastContext';
 import type { Complaint } from '../../data/types';
 import { formatDate } from '../../lib';
-import { PageHeader, Table, type Column, Select, StatusPill, StatCard, Loading, EmptyState } from '../../components';
+import { PageHeader, Table, type Column, Select, StatusPill, StatCard, Loading, EmptyState, DetailModal } from '../../components';
 
 const STATUSES: Complaint['status'][] = ['open', 'in_progress', 'resolved'];
 
@@ -16,6 +17,8 @@ const statusTone: Record<Complaint['status'], 'success' | 'warning' | 'danger' |
 export function ComplaintsPage() {
   const { data: rows, loading, reload } = useAsync(() => complaintService.list(), []);
   const toast = useToast();
+
+  const [detailTarget, setDetailTarget] = useState<Complaint | null>(null);
 
   const openCount = rows?.filter((c) => c.status === 'open').length ?? 0;
   const inProgressCount = rows?.filter((c) => c.status === 'in_progress').length ?? 0;
@@ -66,8 +69,26 @@ export function ComplaintsPage() {
       ) : !rows || rows.length === 0 ? (
         <EmptyState icon="alert" title="No complaints found" />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
       )}
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Complaint details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Student', value: detailTarget.studentName },
+                { label: 'Category', value: detailTarget.category },
+                { label: 'Subject', value: detailTarget.subject },
+                { label: 'Status', value: <StatusPill status={statusTone[detailTarget.status]} label={detailTarget.status} /> },
+                { label: 'Created', value: formatDate(detailTarget.createdOn) },
+                { label: 'Description', value: detailTarget.description, full: true },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

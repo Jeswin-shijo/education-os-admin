@@ -20,6 +20,7 @@ import {
   Banner,
   Loading,
   EmptyState,
+  DetailModal,
 } from '../../components';
 
 const CATEGORIES: EventItem['category'][] = ['tech', 'cultural', 'sports', 'workshop'];
@@ -59,6 +60,7 @@ export function EventsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<EventItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<EventItem | null>(null);
 
   function openCreate() {
     setForm(emptyForm);
@@ -156,7 +158,7 @@ export function EventsPage() {
       ) : !rows || rows.length === 0 ? (
         <EmptyState icon="campus" title="No events found" actionLabel="Add event" onAction={openCreate} />
       ) : (
-        <Table columns={columns} rows={rows} />
+        <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add event">
@@ -191,6 +193,29 @@ export function EventsPage() {
         title="Remove event"
         message={`Remove ${deleteTarget?.title}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Event details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Title', value: detailTarget.title },
+                { label: 'Date', value: formatDate(detailTarget.date) },
+                { label: 'Time', value: detailTarget.time },
+                { label: 'Venue', value: detailTarget.venue },
+                { label: 'Category', value: <StatusPill status={categoryTone[detailTarget.category]} label={detailTarget.category} /> },
+                { label: 'Description', value: detailTarget.description, full: true },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const e = detailTarget;
+          setDetailTarget(null);
+          if (e) setDeleteTarget(e);
+        }}
       />
     </div>
   );

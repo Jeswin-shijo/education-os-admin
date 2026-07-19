@@ -17,6 +17,7 @@ import {
   SearchableSelect,
   Chip,
   Badge,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -68,6 +69,7 @@ export function NotificationsPage() {
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState<string>();
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
+  const [detailTarget, setDetailTarget] = useState<NotificationItem | null>(null);
   const toast = useToast();
 
   function setField<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
@@ -195,10 +197,30 @@ export function NotificationsPage() {
         <EmptyState icon="notification" title="No notifications sent yet" />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Notification details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Title', value: detailTarget.title },
+                { label: 'Category', value: <Badge tone={categoryTone[detailTarget.category]} label={detailTarget.category} /> },
+                {
+                  label: 'Recipient',
+                  value: detailTarget.recipientName ? detailTarget.recipientName : `Broadcast: ${detailTarget.broadcastRole || 'everyone'}`,
+                },
+                { label: 'Sent', value: formatRelative(detailTarget.sentAt) },
+                { label: 'Message', value: detailTarget.body, full: true },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

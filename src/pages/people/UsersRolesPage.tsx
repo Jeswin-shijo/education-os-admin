@@ -12,6 +12,7 @@ import {
   Select,
   StatusPill,
   Button,
+  DetailModal,
   Loading,
   EmptyState,
   Pagination,
@@ -32,6 +33,7 @@ export function UsersRolesPage() {
   );
 
   const [busyId, setBusyId] = useState<string>();
+  const [detailTarget, setDetailTarget] = useState<PlatformUser | null>(null);
   const toast = useToast();
 
   async function handleRoleChange(user: PlatformUser, role: Role) {
@@ -131,10 +133,44 @@ export function UsersRolesPage() {
         <EmptyState icon="people" title="No users found" />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="User details"
+        header={
+          detailTarget && (
+            <div className="flex items-center gap-3">
+              <Avatar name={detailTarget.name} size={48} color={detailTarget.avatarColor} />
+              <div>
+                <div className="text-h3 text-ink">{detailTarget.name}</div>
+                <div className="text-small text-ink-muted">{detailTarget.email}</div>
+              </div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Email', value: detailTarget.email },
+                { label: 'Role', value: detailTarget.role.charAt(0).toUpperCase() + detailTarget.role.slice(1) },
+                {
+                  label: 'Status',
+                  value: (
+                    <StatusPill
+                      label={detailTarget.active ? 'Active' : 'Inactive'}
+                      status={detailTarget.active ? 'success' : 'neutral'}
+                    />
+                  ),
+                },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

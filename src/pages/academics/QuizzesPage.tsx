@@ -16,6 +16,7 @@ import {
   Select,
   Card,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -61,6 +62,7 @@ export function QuizzesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Quiz | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Quiz | null>(null);
   const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
@@ -178,7 +180,7 @@ export function QuizzesPage() {
         <EmptyState icon="subject" title="No quizzes found" actionLabel="Create quiz" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -265,6 +267,33 @@ export function QuizzesPage() {
         title="Remove quiz"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Quiz details"
+        header={
+          detailTarget && (
+            <div>
+              <div className="text-h3 text-ink">{detailTarget.title}</div>
+              <div className="text-small text-ink-muted">{subjectName(detailTarget.subjectId)}</div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Subject', value: subjectName(detailTarget.subjectId) },
+                { label: 'Questions', value: detailTarget.questions.length },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const qz = detailTarget;
+          setDetailTarget(null);
+          if (qz) setDeleteTarget(qz);
+        }}
       />
     </div>
   );

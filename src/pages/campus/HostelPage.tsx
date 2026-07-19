@@ -17,6 +17,7 @@ import {
   SearchableSelect,
   Chip,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -79,6 +80,7 @@ export function HostelPage() {
   const [blockFormError, setBlockFormError] = useState<string>();
   const [blockDeleteTarget, setBlockDeleteTarget] = useState<HostelBlock | null>(null);
   const [blockDeleting, setBlockDeleting] = useState(false);
+  const [blockDetailTarget, setBlockDetailTarget] = useState<HostelBlock | null>(null);
   const blockErrors = useFieldErrors();
 
   function openCreateBlock() {
@@ -136,6 +138,7 @@ export function HostelPage() {
   const [roomForm, setRoomForm] = useState(emptyRoomForm);
   const [roomSaving, setRoomSaving] = useState(false);
   const [roomFormError, setRoomFormError] = useState<string>();
+  const [roomDetailTarget, setRoomDetailTarget] = useState<HostelRoom | null>(null);
   const roomErrors = useFieldErrors();
 
   function openCreateRoom() {
@@ -177,6 +180,7 @@ export function HostelPage() {
   const [allocationFormError, setAllocationFormError] = useState<string>();
   const [allocationDeleteTarget, setAllocationDeleteTarget] = useState<HostelAllocation | null>(null);
   const [allocationDeleting, setAllocationDeleting] = useState(false);
+  const [allocationDetailTarget, setAllocationDetailTarget] = useState<HostelAllocation | null>(null);
   const allocErrors = useFieldErrors();
 
   function openCreateAllocation() {
@@ -299,7 +303,7 @@ export function HostelPage() {
             <EmptyState icon="hostel" title="No hostel blocks found" actionLabel="Add block" onAction={openCreateBlock} />
           ) : (
             <>
-              <Table columns={blockColumns} rows={blockRows} />
+              <Table columns={blockColumns} rows={blockRows} onRowClick={setBlockDetailTarget} />
               <Pagination page={blockPage} totalPages={blockPagination.totalPages} count={blockPagination.count} limit={blockPagination.limit} onPageChange={setBlockPage} />
             </>
           )}
@@ -318,7 +322,7 @@ export function HostelPage() {
             <EmptyState icon="hostel" title="No rooms found" actionLabel="Add room" onAction={openCreateRoom} />
           ) : (
             <>
-              <Table columns={roomColumns} rows={roomRows} />
+              <Table columns={roomColumns} rows={roomRows} onRowClick={setRoomDetailTarget} />
               <Pagination page={roomPage} totalPages={roomPagination.totalPages} count={roomPagination.count} limit={roomPagination.limit} onPageChange={setRoomPage} />
             </>
           )}
@@ -337,7 +341,7 @@ export function HostelPage() {
             <EmptyState icon="hostel" title="No allocations found" actionLabel="Add allocation" onAction={openCreateAllocation} />
           ) : (
             <>
-              <Table columns={allocationColumns} rows={allocationRows} />
+              <Table columns={allocationColumns} rows={allocationRows} onRowClick={setAllocationDetailTarget} />
               <Pagination page={allocationPage} totalPages={allocationPagination.totalPages} count={allocationPagination.count} limit={allocationPagination.limit} onPageChange={setAllocationPage} />
             </>
           )}
@@ -429,6 +433,63 @@ export function HostelPage() {
         title="Remove allocation"
         message={`Remove allocation for ${allocationDeleteTarget?.studentName}? This cannot be undone.`}
         loading={allocationDeleting}
+      />
+
+      <DetailModal
+        open={!!blockDetailTarget}
+        onClose={() => setBlockDetailTarget(null)}
+        title="Block details"
+        fields={
+          blockDetailTarget
+            ? [
+                { label: 'Block', value: blockDetailTarget.name },
+                { label: 'Warden', value: blockDetailTarget.warden },
+                { label: 'Warden phone', value: blockDetailTarget.wardenPhone },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const b = blockDetailTarget;
+          setBlockDetailTarget(null);
+          if (b) setBlockDeleteTarget(b);
+        }}
+      />
+
+      <DetailModal
+        open={!!roomDetailTarget}
+        onClose={() => setRoomDetailTarget(null)}
+        title="Room details"
+        fields={
+          roomDetailTarget
+            ? [
+                { label: 'Block', value: blockName(roomDetailTarget.blockId) },
+                { label: 'Room no.', value: roomDetailTarget.roomNo },
+                { label: 'Capacity', value: roomDetailTarget.capacity },
+              ]
+            : []
+        }
+      />
+
+      <DetailModal
+        open={!!allocationDetailTarget}
+        onClose={() => setAllocationDetailTarget(null)}
+        title="Allocation details"
+        fields={
+          allocationDetailTarget
+            ? [
+                { label: 'Student', value: allocationDetailTarget.studentName },
+                { label: 'Room', value: roomLabel(allocationDetailTarget.roomId) },
+                { label: 'Bed', value: allocationDetailTarget.bed },
+                { label: 'Mess plan', value: allocationDetailTarget.messPlan },
+                { label: 'Fees', value: formatINR(allocationDetailTarget.fees) },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const a = allocationDetailTarget;
+          setAllocationDetailTarget(null);
+          if (a) setAllocationDeleteTarget(a);
+        }}
       />
     </div>
   );

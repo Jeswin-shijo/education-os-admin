@@ -13,6 +13,7 @@ import {
   Modal,
   Select,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -35,6 +36,7 @@ export function SemestersPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Semester | null>(null);
   const toast = useToast();
 
   function openCreate() {
@@ -109,7 +111,7 @@ export function SemestersPage() {
         <EmptyState icon="academics" title="No semesters found" actionLabel="Add semester" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -145,6 +147,25 @@ export function SemestersPage() {
         title="Remove semester"
         message={`Remove Semester ${deleteTarget?.number}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Semester details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Program', value: programName(detailTarget.programId) },
+                { label: 'Semester', value: `Semester ${detailTarget.number}` },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const s = detailTarget;
+          setDetailTarget(null);
+          if (s) setDeleteTarget(s);
+        }}
       />
     </div>
   );

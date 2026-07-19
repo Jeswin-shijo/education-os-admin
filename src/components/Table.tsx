@@ -32,7 +32,12 @@ export function Table<T extends { id: string }>({
           {rows.map((row) => (
             <tr
               key={row.id}
-              onClick={() => onRowClick?.(row)}
+              onClick={(e) => {
+                // Ignore clicks on the inline row controls (edit/delete buttons, links, inputs)
+                // so those still work while a bare row-click opens the detail view.
+                if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
+                onRowClick?.(row);
+              }}
               className={`border-b border-line-soft last:border-b-0 ${onRowClick ? 'cursor-pointer hover:bg-surface-alt' : ''}`}
             >
               {columns.map((col) => (

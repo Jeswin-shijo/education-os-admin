@@ -17,6 +17,7 @@ import {
   Select,
   Badge,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -108,6 +109,7 @@ export function MaterialsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Material | null>(null);
   const toast = useToast();
 
   const subjectOptions = (subjects ?? []).map((s) => ({ label: `${s.code} — ${s.name}`, value: s.id }));
@@ -212,7 +214,7 @@ export function MaterialsPage() {
         <EmptyState icon="subject" title="No materials found" actionLabel="Upload material" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -273,6 +275,35 @@ export function MaterialsPage() {
         title="Remove material"
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Material details"
+        header={
+          detailTarget && (
+            <div>
+              <div className="text-h3 text-ink">{detailTarget.title}</div>
+              <div className="text-small text-ink-muted">{subjectName(detailTarget.subjectId)}</div>
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Subject', value: subjectName(detailTarget.subjectId) },
+                { label: 'Kind', value: <Badge label={detailTarget.kind} tone={kindTone[detailTarget.kind]} /> },
+                { label: 'Size', value: detailTarget.sizeLabel },
+                { label: 'Added', value: formatRelative(detailTarget.addedAt) },
+              ]
+            : []
+        }
+        onDelete={() => {
+          const m = detailTarget;
+          setDetailTarget(null);
+          if (m) setDeleteTarget(m);
+        }}
       />
     </div>
   );

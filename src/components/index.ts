@@ -18,6 +18,7 @@ export * from './SearchBar';
 export * from './Table';
 export * from './Pagination';
 export * from './Modal';
+export * from './DetailModal';
 export * from './ConfirmDialog';
 export * from './PageHeader';
 export * from './Tabs';

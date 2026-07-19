@@ -17,6 +17,7 @@ import {
   SearchableSelect,
   DatePicker,
   ConfirmDialog,
+  DetailModal,
   StatusPill,
   Chip,
   Banner,
@@ -51,6 +52,7 @@ function BooksTab() {
 
   const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Book | null>(null);
   const toast = useToast();
 
   function openCreate() {
@@ -160,7 +162,7 @@ function BooksTab() {
         <EmptyState icon="academics" title="No books found" actionLabel="Add book" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -190,6 +192,43 @@ function BooksTab() {
         message={`Remove "${deleteTarget?.title}"? This cannot be undone.`}
         loading={deleting}
       />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Book details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Title', value: detailTarget.title },
+                { label: 'Author', value: detailTarget.author },
+                { label: 'Category', value: detailTarget.category },
+                { label: 'ISBN', value: detailTarget.isbn },
+                { label: 'Copies', value: detailTarget.copies },
+                { label: 'Available', value: detailTarget.available },
+                {
+                  label: 'Availability',
+                  value:
+                    detailTarget.available > 0 ? (
+                      <StatusPill status="success" label={`${detailTarget.available}/${detailTarget.copies} available`} />
+                    ) : (
+                      <StatusPill status="danger" label="Out of stock" />
+                    ),
+                },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const b = detailTarget;
+          setDetailTarget(null);
+          if (b) openEdit(b);
+        }}
+        onDelete={() => {
+          const b = detailTarget;
+          setDetailTarget(null);
+          if (b) setDeleteTarget(b);
+        }}
+      />
     </div>
   );
 }
@@ -213,6 +252,7 @@ function LoansTab() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [returningId, setReturningId] = useState<string | null>(null);
+  const [detailTarget, setDetailTarget] = useState<BookLoan | null>(null);
   const { errors, setErrors, clearError, resetErrors } = useFieldErrors();
   const toast = useToast();
 
@@ -325,7 +365,7 @@ function LoansTab() {
         <EmptyState icon="academics" title="No loans yet" actionLabel="Issue book" onAction={openIssue} />
       ) : (
         <>
-          <Table columns={columns} rows={loans} />
+          <Table columns={columns} rows={loans} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -345,6 +385,24 @@ function LoansTab() {
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Loan details"
+        fields={
+          detailTarget
+            ? [
+                { label: 'Book', value: detailTarget.bookTitle || bookById.get(detailTarget.bookId) },
+                { label: 'Student', value: detailTarget.studentName || studentById.get(detailTarget.studentId) },
+                { label: 'Issued on', value: detailTarget.issuedOn },
+                { label: 'Due on', value: detailTarget.dueOn },
+                { label: 'Status', value: loanStatusPill(detailTarget) },
+                { label: 'Returned on', value: detailTarget.returnedOn },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

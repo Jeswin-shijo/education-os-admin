@@ -18,6 +18,7 @@ import {
   SearchableSelect,
   Badge,
   ConfirmDialog,
+  DetailModal,
   Banner,
   Loading,
   EmptyState,
@@ -59,6 +60,7 @@ export function SubjectsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Subject | null>(null);
   const toast = useToast();
 
   const departmentOptions = (departments ?? []).map((d) => ({ label: d.name, value: d.id }));
@@ -264,7 +266,7 @@ export function SubjectsPage() {
         <EmptyState icon="academics" title="No subjects found" actionLabel="Add subject" onAction={openCreate} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
+          <Table columns={columns} rows={rows} onRowClick={setDetailTarget} />
           <Pagination page={page} totalPages={pagination.totalPages} count={pagination.count} limit={pagination.limit} onPageChange={setPage} />
         </>
       )}
@@ -347,6 +349,48 @@ export function SubjectsPage() {
         title="Remove subject"
         message={`Remove ${deleteTarget?.name}? This cannot be undone.`}
         loading={deleting}
+      />
+
+      <DetailModal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title="Subject details"
+        header={
+          detailTarget && (
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="text-h3 text-ink">{detailTarget.name}</div>
+                <div className="text-small text-ink-muted">{detailTarget.code}</div>
+              </div>
+              {CORE_SUBJECT_IDS.includes(detailTarget.id) && <Badge label="Core" tone="neutral" />}
+            </div>
+          )
+        }
+        fields={
+          detailTarget
+            ? [
+                { label: 'Code', value: detailTarget.code },
+                { label: 'Credits', value: detailTarget.credits },
+                { label: 'Academic Session', value: detailTarget.academicSession },
+                { label: 'Department', value: departmentName(detailTarget.departmentId) },
+                { label: 'Faculty', value: facultyDisplay(detailTarget), full: true },
+              ]
+            : []
+        }
+        onEdit={() => {
+          const s = detailTarget;
+          setDetailTarget(null);
+          if (s) openEdit(s);
+        }}
+        onDelete={
+          detailTarget && !CORE_SUBJECT_IDS.includes(detailTarget.id)
+            ? () => {
+                const s = detailTarget;
+                setDetailTarget(null);
+                if (s) setDeleteTarget(s);
+              }
+            : undefined
+        }
       />
     </div>
   );
